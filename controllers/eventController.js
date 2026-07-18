@@ -33,8 +33,12 @@ export async function getEvent(req, res) {
 }
 
 export async function updateEvent(req, res) {
-  const event = await Event.findByIdAndUpdate(req.params.id, body(req.body), { new: true, runValidators: true });
+  const event = await Event.findById(req.params.id);
   if (!event) throw httpError(404, "Event not found");
+  await refreshEventStatus(event);
+  if (["completed", "cancelled"].includes(event.status)) throw httpError(409, `${event.status === "completed" ? "Completed" : "Cancelled"} events are read-only and cannot be changed`);
+  event.set(body(req.body));
+  await event.save();
   await refreshEventStatus(event);
   res.json({ success: true, event });
 }
