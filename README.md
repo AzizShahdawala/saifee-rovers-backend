@@ -48,6 +48,8 @@ Registration processes the five webcam photos and stores an averaged normalized 
 
 Attendance has a unique member/event constraint, preventing duplicate check-ins. Deleting a member or event also removes its attendance records.
 
+Member patrols are restricted to Fox, Dove, Bull, and Peacock. Run `npm run migrate:patrols` after upgrading an existing database; the migration normalizes patrol values, initializes `isPatrolLeader`, and creates the one-active-leader-per-patrol index.
+
 Member portal endpoints require a member JWT. First-time member activation and both admin/member password resets use six-digit email codes. Codes are never returned by the API.
 
 Email delivery uses Gmail through Nodemailer. Set `SMTP_PASSWORD` to the Google app password for `azizshada@gmail.com` (not the normal Gmail password). Spaces in an app password are accepted and normalized. In local development without that credential, Nodemailer's stream transport writes the generated email to the backend terminal for testing; production refuses to generate an OTP when delivery is unavailable.

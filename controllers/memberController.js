@@ -1,18 +1,27 @@
 import fs from "fs/promises";
 import path from "path";
-import Member from "../models/Member.js";
+import Member, { PATROLS } from "../models/Member.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 
-const fields = ["name", "phone", "email", "patrol", "status"];
+const fields = ["name", "phone", "email", "patrol", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
+const isTrue = (value) => value === true || value === "true";
+
+async function ensureLeaderAvailable({ patrol, isPatrolLeader, status = "active", excludeId }) {
+  if (!PATROLS.includes(patrol)) throw httpError(400, `Patrol must be one of: ${PATROLS.join(", ")}`);
+  if (!isTrue(isPatrolLeader) || status !== "active") return;
+  const existingLeader = await Member.findOne({ patrol, isPatrolLeader: true, status: "active", ...(excludeId ? { _id: { $ne: excludeId } } : {}) });
+  if (existingLeader) throw httpError(409, `${patrol} patrol already has an active leader: ${existingLeader.name}`);
+}
 
 export async function registerMember(req, res) {
   if (!req.files || req.files.length !== 5) throw httpError(400, "Exactly 5 images are required");
   const data = memberBody(req.body);
   if (!data.name || !data.phone || !data.email || !data.patrol) throw httpError(400, "Name, phone, email and patrol are required");
   try {
+    await ensureLeaderAvailable(data);
     const { descriptor } = await enrollmentDescriptor(req.files.map((file) => file.path));
     const member = await Member.create({
       ...data,
@@ -26,13 +35,6 @@ export async function registerMember(req, res) {
     if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
     throw error;
   }
-}
-
-export async function createMember(req, res) {
-  const data = memberBody(req.body);
-  if (!data.name) throw httpError(400, "Name is required");
-  const member = await Member.create(data);
-  res.status(201).json({ success: true, member });
 }
 
 export async function listMembers(req, res) {
@@ -50,8 +52,13 @@ export async function getMember(req, res) {
 }
 
 export async function updateMember(req, res) {
-  const member = await Member.findByIdAndUpdate(req.params.id, memberBody(req.body), { new: true, runValidators: true });
+  const member = await Member.findById(req.params.id);
   if (!member) throw httpError(404, "Member not found");
+  const data = memberBody(req.body);
+  const next = { patrol: data.patrol ?? member.patrol, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, status: data.status ?? member.status };
+  await ensureLeaderAvailable({ ...next, excludeId: member._id });
+  member.set(data);
+  await member.save();
   res.json({ success: true, member });
 }
 
