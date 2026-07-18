@@ -1,6 +1,7 @@
 import Event from "../models/Event.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
+import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
 
 const writable = ["title", "date", "startTime", "endTime", "venue", "agenda", "capacity", "status"];
 const body = (value) => Object.fromEntries(writable.filter((key) => value[key] !== undefined).map((key) => [key, value[key]]));
@@ -8,10 +9,12 @@ const body = (value) => Object.fromEntries(writable.filter((key) => value[key] !
 export async function createEvent(req, res) {
   if (!req.body.title?.trim() || !req.body.date) throw httpError(400, "Title and date are required");
   const event = await Event.create(body(req.body));
+  await refreshEventStatus(event);
   res.status(201).json({ success: true, event });
 }
 
 export async function listEvents(req, res) {
+  await syncEventStatuses();
   const events = await Event.aggregate([
     { $sort: { date: -1 } },
     { $lookup: { from: "attendances", localField: "_id", foreignField: "event", as: "attendanceRecords" } },
@@ -25,12 +28,14 @@ export async function listEvents(req, res) {
 export async function getEvent(req, res) {
   const event = await Event.findById(req.params.id);
   if (!event) throw httpError(404, "Event not found");
+  await refreshEventStatus(event);
   res.json({ success: true, event });
 }
 
 export async function updateEvent(req, res) {
   const event = await Event.findByIdAndUpdate(req.params.id, body(req.body), { new: true, runValidators: true });
   if (!event) throw httpError(404, "Event not found");
+  await refreshEventStatus(event);
   res.json({ success: true, event });
 }
 

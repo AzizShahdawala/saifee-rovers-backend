@@ -19,6 +19,8 @@ services:
         sync: false
       - key: FACE_MATCH_THRESHOLD
         value: "0.45"
+      - key: EVENT_TIMEZONE_OFFSET_MINUTES
+        value: "330"
       - key: SMTP_USER
         value: azizshada@gmail.com
       - key: SMTP_PASSWORD

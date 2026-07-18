@@ -3,6 +3,7 @@ import Member from "../models/Member.js";
 import Event from "../models/Event.js";
 import httpError from "../utils/httpError.js";
 import { cosineSimilarity, embeddingFromDataUrl } from "../services/faceRecognitionService.js";
+import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
 
 const populate = (query) => query.populate("member", "name email phone patrol status images").populate("event", "title date venue");
 
@@ -38,6 +39,7 @@ export async function recordManual(req, res) {
 }
 
 export async function recognizeAttendance(req, res) {
+  await syncEventStatuses();
   if (!req.body.image) throw httpError(400, "A camera image is required");
   const face = await embeddingFromDataUrl(req.body.image);
   const members = await Member.find({ status: "active", faceEnrolled: true }).select("+descriptor");
@@ -60,6 +62,8 @@ export async function recognizeAttendance(req, res) {
     : await Event.findOne({ status: { $in: ["active", "ongoing"] } }).sort({ date: -1 })
       || await Event.findOne({ date: { $gte: startOfDay, $lt: endOfDay }, status: { $ne: "cancelled" } }).sort({ startTime: 1 });
   if (!event) throw httpError(400, "No active event is available. Mark an event Active before scanning attendance");
+  await refreshEventStatus(event);
+  if (!['active', 'ongoing'].includes(event.status)) throw httpError(400, event.status === 'completed' ? "This event has ended and no longer accepts scanner attendance" : "This event is not currently active");
 
   let attendance;
   try {

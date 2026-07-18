@@ -1,8 +1,10 @@
 import Member from "../models/Member.js";
 import Event from "../models/Event.js";
 import Attendance from "../models/Attendance.js";
+import { syncEventStatuses } from "../services/eventStatusService.js";
 
 export async function getDashboard(req, res) {
+  await syncEventStatuses();
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
