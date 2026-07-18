@@ -35,6 +35,8 @@ Registration processes the five webcam photos and stores an averaged normalized 
 - `GET /api/member-portal/dashboard`
 - `GET /api/member-portal/attendance`
 - `GET /api/member-portal/events`
+- `PUT /api/member-portal/me/password`
+- `PUT /api/member-portal/me/photo` (multipart `photo`)
 - `GET|POST /api/members`, `GET|PUT|DELETE /api/members/:id`
 - `POST /api/members/register` (multipart form with exactly five `images`)
 - `GET|POST /api/events`, `GET|PUT|DELETE /api/events/:id`

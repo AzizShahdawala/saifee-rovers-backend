@@ -60,5 +60,6 @@ export async function deleteMember(req, res) {
   if (!member) throw httpError(404, "Member not found");
   await Attendance.deleteMany({ member: member._id });
   if (member.folder) await fs.rm(path.join("uploads", "members", member.folder), { recursive: true, force: true });
+  await fs.rm(path.join("uploads", "members", String(member._id)), { recursive: true, force: true });
   res.json({ success: true, message: "Member deleted" });
 }

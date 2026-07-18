@@ -26,6 +26,7 @@ const memberSchema = new mongoose.Schema({
   },
   folder: String,
   images: [imageSchema],
+  profilePhoto: imageSchema,
   status: {
     type: String,
     enum: ["active", "inactive"],
@@ -48,7 +49,7 @@ memberSchema.index({ email: 1 }, { unique: true, sparse: true });
 memberSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 memberSchema.virtual("profileImage").get(function profileImage() {
-  const image = this.images?.[0];
+  const image = this.profilePhoto?.path ? this.profilePhoto : this.images?.[0];
   const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
   return image ? `${baseUrl}/${String(image.path).replaceAll("\\\\", "/")}` : undefined;
 });
