@@ -10,9 +10,9 @@ function createTransport() {
     return nodemailer.createTransport({
       service: "gmail",
       auth: { user: gmailUser, pass: gmailPassword },
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 50,
+      connectionTimeout: 15_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
     });
   }
   if (process.env.NODE_ENV === "production") throw new Error("Gmail delivery is not configured. Set SMTP_PASSWORD to a Google app password");
