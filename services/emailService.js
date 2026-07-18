@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 
 const gmailUser = process.env.SMTP_USER || "azizshada@gmail.com";
 const gmailPassword = String(process.env.SMTP_PASSWORD || "").replace(/\s/g, "");
@@ -50,15 +51,19 @@ function emailHtml({ name, otp, action }) {
 export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
   const transporter = createTransport();
   const action = purpose === "activation" ? "activate your member account" : "reset your password";
+  const reference = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const subject = purpose === "activation" ? "Activate your Saifee Rovers account" : "Reset your Saifee Rovers password";
   const info = await transporter.sendMail({
     from: process.env.EMAIL_FROM || `Saifee Rovers <${gmailUser}>`,
     to: email,
-    subject: purpose === "activation" ? "Activate your Saifee Rovers account" : "Reset your Saifee Rovers password",
+    subject: `${subject} [${reference}]`,
+    headers: { "X-Entity-Ref-ID": reference },
     text: `Hello ${name}, use verification code ${otp} to ${action}. It expires in 10 minutes. If you did not request this, ignore this email.`,
     html: emailHtml({ name, otp, action }),
   });
   if (!hasGmailCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
-  return { messageId: info.messageId };
+  if (hasGmailCredentials()) console.info("Verification email accepted", { to: email, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
+  return { messageId: info.messageId, accepted: info.accepted || [], rejected: info.rejected || [] };
 }
 
 export async function verifyEmailTransport() {
