@@ -24,9 +24,14 @@ export async function listAttendance(req, res) {
 export async function recordManual(req, res) {
   const { memberId, eventId, status = "present" } = req.body;
   if (!memberId || !eventId) throw httpError(400, "Member and event are required");
+  await syncEventStatuses();
   const [member, event] = await Promise.all([Member.findById(memberId), Event.findById(eventId)]);
   if (!member) throw httpError(404, "Member not found");
   if (!event) throw httpError(404, "Event not found");
+  await refreshEventStatus(event);
+  if (!["active", "ongoing"].includes(event.status)) {
+    throw httpError(400, "Manual attendance can only be recorded while an event is active");
+  }
   let attendance;
   try {
     attendance = await Attendance.create({ member: memberId, event: eventId, status, source: "manual" });
@@ -41,6 +46,13 @@ export async function recordManual(req, res) {
 export async function recognizeAttendance(req, res) {
   await syncEventStatuses();
   if (!req.body.image) throw httpError(400, "A camera image is required");
+  const event = req.body.eventId
+    ? await Event.findById(req.body.eventId)
+    : await Event.findOne({ status: { $in: ["active", "ongoing"] } }).sort({ date: -1, startTime: -1 });
+  if (!event) throw httpError(400, "No active event is available for attendance scanning");
+  await refreshEventStatus(event);
+  if (!["active", "ongoing"].includes(event.status)) throw httpError(400, event.status === "completed" ? "This event has ended and no longer accepts scanner attendance" : "This event is not currently active");
+
   const face = await embeddingFromDataUrl(req.body.image);
   const members = await Member.find({ status: "active", faceEnrolled: true }).select("+descriptor");
   if (!members.length) throw httpError(404, "No face-enrolled members are available. Re-enroll a member first");
@@ -53,17 +65,6 @@ export async function recognizeAttendance(req, res) {
   }
   const threshold = Number(process.env.FACE_MATCH_THRESHOLD || 0.45);
   if (!bestMember || bestScore < threshold) throw httpError(404, "Face not recognized. Try again with the same lighting used during enrollment");
-
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay); endOfDay.setDate(endOfDay.getDate() + 1);
-  const event = req.body.eventId
-    ? await Event.findById(req.body.eventId)
-    : await Event.findOne({ status: { $in: ["active", "ongoing"] } }).sort({ date: -1 })
-      || await Event.findOne({ date: { $gte: startOfDay, $lt: endOfDay }, status: { $ne: "cancelled" } }).sort({ startTime: 1 });
-  if (!event) throw httpError(400, "No active event is available. Mark an event Active before scanning attendance");
-  await refreshEventStatus(event);
-  if (!['active', 'ongoing'].includes(event.status)) throw httpError(400, event.status === 'completed' ? "This event has ended and no longer accepts scanner attendance" : "This event is not currently active");
 
   let attendance;
   try {
