@@ -7,3 +7,10 @@ export default function requireAuth(req, res, next) {
   req.user = user;
   next();
 }
+
+export function requireRole(role) {
+  return (req, res, next) => {
+    if (req.user?.role !== role) return res.status(403).json({ success: false, message: "You do not have access to this resource" });
+    next();
+  };
+}

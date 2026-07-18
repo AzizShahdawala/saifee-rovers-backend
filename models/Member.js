@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import mongoose from "mongoose";
 
 const imageSchema = new mongoose.Schema({
@@ -32,6 +33,15 @@ const memberSchema = new mongoose.Schema({
   },
   faceEnrolled: { type: Boolean, default: false },
   descriptor: { type: [Number], select: false, default: undefined },
+  passwordHash: { type: String, select: false },
+  passwordSalt: { type: String, select: false },
+  passwordSetAt: Date,
+  otpHash: { type: String, select: false },
+  otpSalt: { type: String, select: false },
+  otpExpiresAt: { type: Date, select: false },
+  otpRequestedAt: { type: Date, select: false },
+  otpAttempts: { type: Number, select: false, default: 0 },
+  lastLoginAt: Date,
 }, { timestamps: true });
 
 memberSchema.index({ email: 1 }, { unique: true, sparse: true });
@@ -44,5 +54,18 @@ memberSchema.virtual("profileImage").get(function profileImage() {
 });
 
 memberSchema.set("toJSON", { virtuals: true });
+
+memberSchema.methods.setPassword = function setPassword(password) {
+  this.passwordSalt = crypto.randomBytes(16).toString("hex");
+  this.passwordHash = crypto.scryptSync(password, this.passwordSalt, 64).toString("hex");
+  this.passwordSetAt = new Date();
+};
+
+memberSchema.methods.verifyPassword = function verifyPassword(password) {
+  if (!this.passwordHash || !this.passwordSalt) return false;
+  const candidate = crypto.scryptSync(password, this.passwordSalt, 64);
+  const stored = Buffer.from(this.passwordHash, "hex");
+  return candidate.length === stored.length && crypto.timingSafeEqual(candidate, stored);
+};
 
 export default mongoose.model("Member", memberSchema);

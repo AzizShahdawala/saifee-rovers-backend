@@ -1,6 +1,6 @@
 # Saifee Rovers backend
 
-Express and MongoDB API for the Saifee Rovers React administration app.
+Express and MongoDB API for the Saifee Rovers administration and member portals.
 
 ## Setup
 
@@ -26,6 +26,13 @@ Registration processes the five webcam photos and stores an averaged normalized 
 ## API
 
 - `POST /api/auth/login`
+- `POST /api/auth/member/request-otp`
+- `POST /api/auth/member/set-password`
+- `POST /api/auth/member/login`
+- `GET /api/member-portal/me`
+- `GET /api/member-portal/dashboard`
+- `GET /api/member-portal/attendance`
+- `GET /api/member-portal/events`
 - `GET|POST /api/members`, `GET|PUT|DELETE /api/members/:id`
 - `POST /api/members/register` (multipart form with exactly five `images`)
 - `GET|POST /api/events`, `GET|PUT|DELETE /api/events/:id`
@@ -36,3 +43,5 @@ Registration processes the five webcam photos and stores an averaged normalized 
 - `GET /api/health`
 
 Attendance has a unique member/event constraint, preventing duplicate check-ins. Deleting a member or event also removes its attendance records.
+
+Member portal endpoints require a member JWT. In production, configure the SMTP variables from `.env.example` so first-time verification codes are delivered by email.
