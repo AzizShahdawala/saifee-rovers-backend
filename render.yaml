@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: saifee-rovers-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://azizshahdawala.github.io
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: FACE_MATCH_THRESHOLD
+        value: "0.45"

@@ -1,0 +1,10 @@
+import express from "express";
+import asyncHandler from "../utils/asyncHandler.js";
+import { deleteAttendance, listAttendance, recognizeAttendance, recordManual, updateAttendance } from "../controllers/attendanceController.js";
+const router = express.Router();
+router.get("/", asyncHandler(listAttendance));
+router.post("/manual", asyncHandler(recordManual));
+router.post("/recognize", asyncHandler(recognizeAttendance));
+router.put("/:id", asyncHandler(updateAttendance));
+router.delete("/:id", asyncHandler(deleteAttendance));
+export default router;

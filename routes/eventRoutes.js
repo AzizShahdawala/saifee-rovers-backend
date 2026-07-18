@@ -1,0 +1,10 @@
+import express from "express";
+import asyncHandler from "../utils/asyncHandler.js";
+import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../controllers/eventController.js";
+const router = express.Router();
+router.get("/", asyncHandler(listEvents));
+router.get("/:id", asyncHandler(getEvent));
+router.post("/", asyncHandler(createEvent));
+router.put("/:id", asyncHandler(updateEvent));
+router.delete("/:id", asyncHandler(deleteEvent));
+export default router;

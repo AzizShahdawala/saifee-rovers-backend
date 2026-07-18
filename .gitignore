@@ -1,0 +1,9 @@
+node_modules/
+.agents/
+.codex/
+.env
+uploads/members/
+*.log
+ai/python/
+ai/__pycache__/
+.render/
