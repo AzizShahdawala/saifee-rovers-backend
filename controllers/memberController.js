@@ -1,27 +1,40 @@
 import fs from "fs/promises";
 import path from "path";
-import Member, { PATROLS } from "../models/Member.js";
+import Member, { INSTRUMENTS, PATROLS } from "../models/Member.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 
-const fields = ["name", "phone", "email", "patrol", "status", "isPatrolLeader"];
+const fields = ["name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
 const isTrue = (value) => value === true || value === "true";
+const uniqueRoleError = (error) => {
+  if (error?.code !== 11000) return error;
+  if (error.keyPattern?.patrolLeaderKey) return httpError(409, "This patrol already has a patrol leader");
+  if (error.keyPattern?.bandInspectorKey) return httpError(409, "Band Inspector is already assigned to another member");
+  return error;
+};
 
-async function ensureLeaderAvailable({ patrol, isPatrolLeader, status = "active", excludeId }) {
+async function ensureUniqueRoles({ patrol, isPatrolLeader, instrument, excludeId }) {
   if (!PATROLS.includes(patrol)) throw httpError(400, `Patrol must be one of: ${PATROLS.join(", ")}`);
-  if (!isTrue(isPatrolLeader) || status !== "active") return;
-  const existingLeader = await Member.findOne({ patrol, isPatrolLeader: true, status: "active", ...(excludeId ? { _id: { $ne: excludeId } } : {}) });
-  if (existingLeader) throw httpError(409, `${patrol} patrol already has an active leader: ${existingLeader.name}`);
+  if (instrument && !INSTRUMENTS.includes(instrument)) throw httpError(400, `Instrument must be one of: ${INSTRUMENTS.join(", ")}`);
+  const excludingCurrent = excludeId ? { _id: { $ne: excludeId } } : {};
+  if (isTrue(isPatrolLeader)) {
+    const existingLeader = await Member.findOne({ patrol, isPatrolLeader: true, ...excludingCurrent });
+    if (existingLeader) throw httpError(409, `${patrol} patrol already has a leader: ${existingLeader.name}`);
+  }
+  if (instrument === "Band Inspector") {
+    const existingInspector = await Member.findOne({ instrument: "Band Inspector", ...excludingCurrent });
+    if (existingInspector) throw httpError(409, `Band Inspector is already assigned to ${existingInspector.name}`);
+  }
 }
 
 export async function registerMember(req, res) {
   if (!req.files || req.files.length !== 5) throw httpError(400, "Exactly 5 images are required");
   const data = memberBody(req.body);
-  if (!data.name || !data.phone || !data.email || !data.patrol) throw httpError(400, "Name, phone, email and patrol are required");
+  if (!data.name || !data.phone || !data.email || !data.patrol || !data.instrument) throw httpError(400, "Name, phone, email, patrol and instrument are required");
   try {
-    await ensureLeaderAvailable(data);
+    await ensureUniqueRoles(data);
     const { descriptor } = await enrollmentDescriptor(req.files.map((file) => file.path));
     const member = await Member.create({
       ...data,
@@ -33,7 +46,7 @@ export async function registerMember(req, res) {
     res.status(201).json({ success: true, member });
   } catch (error) {
     if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
-    throw error;
+    throw uniqueRoleError(error);
   }
 }
 
@@ -55,10 +68,15 @@ export async function updateMember(req, res) {
   const member = await Member.findById(req.params.id);
   if (!member) throw httpError(404, "Member not found");
   const data = memberBody(req.body);
-  const next = { patrol: data.patrol ?? member.patrol, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, status: data.status ?? member.status };
-  await ensureLeaderAvailable({ ...next, excludeId: member._id });
+  const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader };
+  if (!next.instrument) throw httpError(400, "Instrument is required");
+  await ensureUniqueRoles({ ...next, excludeId: member._id });
   member.set(data);
-  await member.save();
+  try {
+    await member.save();
+  } catch (error) {
+    throw uniqueRoleError(error);
+  }
   res.json({ success: true, member });
 }
 

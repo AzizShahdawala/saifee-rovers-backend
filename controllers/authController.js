@@ -40,6 +40,7 @@ const publicMember = (member) => ({
   email: member.email,
   phone: member.phone,
   patrol: member.patrol,
+  instrument: member.instrument,
   role: "member",
   profileImage: member.profileImage,
 });
@@ -104,7 +105,8 @@ export async function memberLogin(req, res) {
   const email = req.body.email?.trim().toLowerCase();
   const password = String(req.body.password || "");
   if (!email || !password) throw httpError(400, "Email and password are required");
-  const member = await Member.findOne({ email, status: "active" }).select("+passwordHash +passwordSalt");
+  const member = await Member.findOne({ email }).select("+passwordHash +passwordSalt");
+  if (member?.status === "inactive") throw httpError(403, "This member is inactive (sleeping) and cannot sign in. Contact an administrator");
   if (!member?.passwordHash) throw httpError(403, "Set your member password before signing in");
   if (!member.verifyPassword(password)) throw httpError(401, "Invalid email or password");
   member.lastLoginAt = new Date();

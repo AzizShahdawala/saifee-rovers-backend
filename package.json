@@ -10,6 +10,7 @@
     "dev:api": "nodemon server.js",
     "ai": "powershell -ExecutionPolicy Bypass -File ai/start.ps1",
     "migrate:patrols": "node scripts/migrateMemberPatrols.js",
+    "migrate:member-roles": "node scripts/migrateMemberRoles.js",
     "sync:events": "node scripts/syncEventStatuses.js"
   },
   "dependencies": {

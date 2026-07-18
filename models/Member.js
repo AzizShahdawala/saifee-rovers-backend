@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-export const PATROLS = ["Fox", "Dove", "Bull", "Peacock"];
+export const PATROLS = ["Fox", "Dove", "Bull", "Peacock", "Officers", "Mentor"];
+export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
 
 const imageSchema = new mongoose.Schema({
   fileName: String,
@@ -28,6 +29,9 @@ const memberSchema = new mongoose.Schema({
     enum: PATROLS,
   },
   isPatrolLeader: { type: Boolean, default: false },
+  patrolLeaderKey: { type: String, select: false, unique: true, sparse: true },
+  instrument: { type: String, enum: ["", ...INSTRUMENTS], default: "" },
+  bandInspectorKey: { type: String, select: false, unique: true, sparse: true },
   folder: String,
   images: [imageSchema],
   profilePhoto: imageSchema,
@@ -51,10 +55,10 @@ const memberSchema = new mongoose.Schema({
 
 memberSchema.index({ email: 1 }, { unique: true, sparse: true });
 memberSchema.index({ phone: 1 }, { unique: true, sparse: true });
-memberSchema.index(
-  { patrol: 1, isPatrolLeader: 1 },
-  { unique: true, partialFilterExpression: { isPatrolLeader: true, status: "active" } },
-);
+memberSchema.pre("validate", function assignUniqueRoleKeys() {
+  this.patrolLeaderKey = this.isPatrolLeader ? this.patrol : undefined;
+  this.bandInspectorKey = this.instrument === "Band Inspector" ? "Band Inspector" : undefined;
+});
 
 memberSchema.virtual("profileImage").get(function profileImage() {
   const image = this.profilePhoto?.path ? this.profilePhoto : this.images?.[0];
