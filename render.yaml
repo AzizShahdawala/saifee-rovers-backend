@@ -19,3 +19,9 @@ services:
         sync: false
       - key: FACE_MATCH_THRESHOLD
         value: "0.45"
+      - key: SMTP_USER
+        value: azizshada@gmail.com
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        value: Saifee Rovers <azizshada@gmail.com>

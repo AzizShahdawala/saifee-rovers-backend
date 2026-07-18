@@ -48,4 +48,4 @@ Attendance has a unique member/event constraint, preventing duplicate check-ins.
 
 Member portal endpoints require a member JWT. First-time member activation and both admin/member password resets use six-digit email codes. Codes are never returned by the API.
 
-In local development without SMTP, Nodemailer's stream transport writes the generated email to the backend terminal for testing. Configure the SMTP variables from `.env.example` before production so verification emails reach registered inboxes.
+Email delivery uses Gmail through Nodemailer. Set `SMTP_PASSWORD` to the Google app password for `azizshada@gmail.com` (not the normal Gmail password). Spaces in an app password are accepted and normalized. In local development without that credential, Nodemailer's stream transport writes the generated email to the backend terminal for testing; production refuses to generate an OTP when delivery is unavailable.
