@@ -13,7 +13,7 @@ async function requestEmbedding(image) {
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
-    throw httpError(503, "Face recognition service is unavailable. Start it with: npm run ai");
+    throw httpError(503, "Face recognition service is unavailable. Restart the backend with: npm run dev");
   }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw httpError(response.status, result.detail || "Face processing failed");
@@ -33,10 +33,22 @@ export async function enrollmentDescriptor(filePaths) {
   const results = await Promise.allSettled(filePaths.map((filePath) => embeddingFromFile(filePath)));
   const embeddings = results.filter((result) => result.status === "fulfilled").map((result) => result.value.embedding);
   if (embeddings.length < 1) {
+    const unavailable = results.find((result) => result.status === "rejected" && result.reason?.status === 503)?.reason;
+    if (unavailable) throw unavailable;
     const reason = results.find((result) => result.status === "rejected")?.reason?.message;
     throw httpError(422, `At least one clear enrollment photo must contain one detectable face${reason ? `: ${reason}` : ""}`);
   }
   return { descriptor: averageEmbeddings(embeddings), acceptedImages: embeddings.length };
+}
+
+export async function recognitionServiceHealth() {
+  try {
+    const response = await fetch(`${serviceUrl()}/health`, { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) throw new Error("Health check failed");
+    return await response.json();
+  } catch {
+    throw httpError(503, "Face recognition service is unavailable. Restart the backend with: npm run dev");
+  }
 }
 
 export function averageEmbeddings(embeddings) {

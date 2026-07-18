@@ -13,13 +13,13 @@ Express and MongoDB API for the Saifee Rovers administration and member portals.
 
 The local CPU-only recognition service uses YuNet face detection and SFace embeddings.
 
-Start it in a second terminal before starting attendance scanning:
+Local development starts both the Node API and recognition service together:
 
 ```powershell
-npm run ai
+npm run dev
 ```
 
-Then keep the Node backend running in the first terminal with `npm run dev`. The AI health endpoint is `http://127.0.0.1:8000/health`.
+The recognition health endpoints are `http://127.0.0.1:8000/health` and `http://localhost:5000/api/recognition/health`. Use `npm run dev:api` only when intentionally running the recognition service separately.
 
 Registration processes the five webcam photos and stores an averaged normalized embedding in MongoDB. Attendance scanning matches that embedding and records attendance against the currently active event. Set an event's status to `Active` before scanning.
 

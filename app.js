@@ -9,6 +9,7 @@ import authRoutes from "./routes/authRoutes.js";
 import memberPortalRoutes from "./routes/memberPortalRoutes.js";
 import asyncHandler from "./utils/asyncHandler.js";
 import { getDashboard } from "./controllers/dashboardController.js";
+import { recognitionServiceHealth } from "./services/faceRecognitionService.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -26,6 +27,7 @@ app.get("/", (req, res) => res.json({
   health: "/api/health",
 }));
 app.get("/api/health", (req, res) => res.json({ success: true, status: "ok" }));
+app.get("/api/recognition/health", asyncHandler(async (req, res) => res.json({ success: true, service: await recognitionServiceHealth() })));
 app.use("/api/auth", authRoutes);
 app.use("/api/member-portal", memberPortalRoutes);
 app.use("/api/members", memberRoutes);
