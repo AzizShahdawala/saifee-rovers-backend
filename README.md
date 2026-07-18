@@ -29,6 +29,8 @@ Registration processes the five webcam photos and stores an averaged normalized 
 - `POST /api/auth/member/request-otp`
 - `POST /api/auth/member/set-password`
 - `POST /api/auth/member/login`
+- `POST /api/auth/password/request-reset`
+- `POST /api/auth/password/reset`
 - `GET /api/member-portal/me`
 - `GET /api/member-portal/dashboard`
 - `GET /api/member-portal/attendance`
@@ -44,4 +46,6 @@ Registration processes the five webcam photos and stores an averaged normalized 
 
 Attendance has a unique member/event constraint, preventing duplicate check-ins. Deleting a member or event also removes its attendance records.
 
-Member portal endpoints require a member JWT. In production, configure the SMTP variables from `.env.example` so first-time verification codes are delivered by email.
+Member portal endpoints require a member JWT. First-time member activation and both admin/member password resets use six-digit email codes. Codes are never returned by the API.
+
+In local development without SMTP, Nodemailer's stream transport writes the generated email to the backend terminal for testing. Configure the SMTP variables from `.env.example` before production so verification emails reach registered inboxes.
