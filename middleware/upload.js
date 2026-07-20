@@ -63,3 +63,20 @@ export const profilePhotoUpload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+const adminProfileStorage = multer.diskStorage({
+  destination(req, file, cb) {
+    const folder = path.join("uploads", "admins", String(req.user.sub), "profile");
+    fs.mkdirSync(folder, { recursive: true });
+    cb(null, folder);
+  },
+  filename(req, file, cb) {
+    cb(null, `profile-${Date.now()}${path.extname(file.originalname).toLowerCase()}`);
+  },
+});
+
+export const adminProfilePhotoUpload = multer({
+  storage: adminProfileStorage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});

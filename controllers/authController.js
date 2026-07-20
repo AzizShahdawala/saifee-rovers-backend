@@ -56,7 +56,7 @@ export async function login(req, res) {
 
   admin.lastLoginAt = new Date();
   await admin.save();
-  const user = { id: admin._id, name: admin.name, email: admin.email, role: admin.role };
+  const user = { id: admin._id, name: admin.name, email: admin.email, role: admin.role, profileImage: admin.profileImage };
   res.json({ success: true, token: createToken({ sub: String(admin._id), email: admin.email, role: admin.role }), user });
 }
 

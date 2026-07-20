@@ -14,8 +14,19 @@ const adminUserSchema = new mongoose.Schema({
   otpAttempts: { type: Number, select: false, default: 0 },
   role: { type: String, enum: ["admin"], default: "admin" },
   active: { type: Boolean, default: true },
+  profilePhoto: {
+    fileName: String,
+    path: String,
+  },
   lastLoginAt: Date,
 }, { timestamps: true });
+
+adminUserSchema.virtual("profileImage").get(function profileImage() {
+  const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+  return this.profilePhoto?.path ? `${baseUrl}/${String(this.profilePhoto.path).replaceAll("\\", "/")}` : undefined;
+});
+
+adminUserSchema.set("toJSON", { virtuals: true });
 
 adminUserSchema.statics.hashPassword = function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
   const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");

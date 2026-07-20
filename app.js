@@ -6,6 +6,7 @@ import memberRoutes from "./routes/memberRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import adminProfileRoutes from "./routes/adminProfileRoutes.js";
 import memberPortalRoutes from "./routes/memberPortalRoutes.js";
 import asyncHandler from "./utils/asyncHandler.js";
 import { getDashboard } from "./controllers/dashboardController.js";
@@ -29,6 +30,7 @@ app.get("/", (req, res) => res.json({
 app.get("/api/health", (req, res) => res.json({ success: true, status: "ok" }));
 app.get("/api/recognition/health", asyncHandler(async (req, res) => res.json({ success: true, service: await recognitionServiceHealth() })));
 app.use("/api/auth", authRoutes);
+app.use("/api/admin-profile", adminProfileRoutes);
 app.use("/api/member-portal", memberPortalRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/events", eventRoutes);
