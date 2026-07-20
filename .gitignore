@@ -3,6 +3,8 @@ node_modules/
 .codex/
 .env
 uploads/members/
+uploads/admins/
+uploads/events/
 *.log
 ai/python/
 ai/__pycache__/

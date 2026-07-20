@@ -80,3 +80,23 @@ export const adminProfilePhotoUpload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+const eventMediaStorage = multer.diskStorage({
+  destination(req, file, cb) {
+    const folder = path.join("uploads", "events", String(req.params.eventId));
+    fs.mkdirSync(folder, { recursive: true });
+    cb(null, folder);
+  },
+  filename(req, file, cb) {
+    const extension = path.extname(file.originalname).toLowerCase();
+    cb(null, `media-${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`);
+  },
+});
+
+const eventMediaFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) cb(null, true);
+  else cb(new Error("Only photo and video files are allowed"));
+};
+
+// Intentionally no fileSize limit: deployment infrastructure may still impose its own request limits.
+export const eventMediaUpload = multer({ storage: eventMediaStorage, fileFilter: eventMediaFilter });
