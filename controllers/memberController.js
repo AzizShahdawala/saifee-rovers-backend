@@ -67,6 +67,12 @@ export async function getMember(req, res) {
 export async function updateMember(req, res) {
   const member = await Member.findById(req.params.id);
   if (!member) throw httpError(404, "Member not found");
+  if (req.body.expectedUpdatedAt) {
+    const expectedUpdatedAt = new Date(req.body.expectedUpdatedAt);
+    if (Number.isNaN(expectedUpdatedAt.getTime()) || expectedUpdatedAt.getTime() !== member.updatedAt.getTime()) {
+      throw httpError(409, "This member was changed after you opened it. Close the dialog, reload the member list, and review the latest details");
+    }
+  }
   const data = memberBody(req.body);
   const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader };
   if (!next.instrument) throw httpError(400, "Instrument is required");
