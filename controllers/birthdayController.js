@@ -49,10 +49,13 @@ export async function getBirthdays(req, res) {
     month: all.filter((item) => monthOccurrence(item, today.getMonth() + 1)).length,
     totalPeople: all.length,
   };
+  const todayBirthdays = all
+    .filter((item) => sameDay(new Date(item.dateOfBirth), today))
+    .sort((a, b) => a.name.localeCompare(b.name));
   let birthdays;
   if (view === "today") birthdays = all.filter((item) => sameDay(new Date(item.dateOfBirth), today));
   else if (view === "week") birthdays = all.filter((item) => item.nextBirthday >= today && item.nextBirthday <= weekEnd);
   else birthdays = all.filter((item) => monthOccurrence(item, requestedMonth)).map((item) => ({ ...item, nextBirthday: occurrence(new Date(item.dateOfBirth), thisYear), daysAway: Math.round((occurrence(new Date(item.dateOfBirth), thisYear) - today) / 86400000), turningAge: thisYear - new Date(item.dateOfBirth).getUTCFullYear() }));
   birthdays.sort((a, b) => new Date(a.nextBirthday) - new Date(b.nextBirthday) || a.name.localeCompare(b.name));
-  res.json({ success: true, birthdays, summary, view, month: requestedMonth });
+  res.json({ success: true, birthdays, todayBirthdays, summary, view, month: requestedMonth });
 }
