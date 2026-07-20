@@ -16,7 +16,8 @@
     "migrate:member-profiles": "node scripts/migrateMemberProfiles.js",
     "migrate:member-families": "node scripts/migrateMemberFamilies.js",
     "sync:events": "node scripts/syncEventStatuses.js",
-    "migrate:remove-event-capacity": "node scripts/removeEventCapacity.js"
+    "migrate:remove-event-capacity": "node scripts/removeEventCapacity.js",
+    "seed:patrol-scores": "node scripts/seedPatrolScores.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
