@@ -1,12 +1,13 @@
 import Event from "../models/Event.js";
 import Attendance from "../models/Attendance.js";
 import EventMedia from "../models/EventMedia.js";
+import Member from "../models/Member.js";
 import fs from "fs/promises";
 import path from "path";
 import httpError from "../utils/httpError.js";
 import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
 
-const writable = ["title", "date", "startTime", "endTime", "venue", "agenda", "capacity", "status"];
+const writable = ["title", "date", "startTime", "endTime", "venue", "agenda", "status"];
 const body = (value) => Object.fromEntries(writable.filter((key) => value[key] !== undefined).map((key) => [key, value[key]]));
 
 export async function createEvent(req, res) {
@@ -18,11 +19,12 @@ export async function createEvent(req, res) {
 
 export async function listEvents(req, res) {
   await syncEventStatuses();
+  const memberCount = await Member.countDocuments();
   const events = await Event.aggregate([
     { $sort: { date: -1 } },
     { $lookup: { from: "attendances", localField: "_id", foreignField: "event", as: "attendanceRecords" } },
     { $addFields: { attendeeCount: { $size: { $filter: { input: "$attendanceRecords", as: "a", cond: { $in: ["$$a.status", ["present", "late"]] } } } } } },
-    { $addFields: { attendancePercentage: { $cond: [{ $gt: ["$capacity", 0] }, { $round: [{ $multiply: [{ $divide: ["$attendeeCount", "$capacity"] }, 100] }, 0] }, 0] } } },
+    { $addFields: { attendancePercentage: memberCount ? { $round: [{ $multiply: [{ $divide: ["$attendeeCount", memberCount] }, 100] }, 0] } : 0 } },
     { $project: { attendanceRecords: 0 } },
   ]);
   res.json({ success: true, events });

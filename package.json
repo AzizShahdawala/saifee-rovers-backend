@@ -15,7 +15,8 @@
     "migrate:member-identities": "node scripts/migrateMemberIdentities.js",
     "migrate:member-profiles": "node scripts/migrateMemberProfiles.js",
     "migrate:member-families": "node scripts/migrateMemberFamilies.js",
-    "sync:events": "node scripts/syncEventStatuses.js"
+    "sync:events": "node scripts/syncEventStatuses.js",
+    "migrate:remove-event-capacity": "node scripts/removeEventCapacity.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
