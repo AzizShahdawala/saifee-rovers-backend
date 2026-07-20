@@ -12,11 +12,13 @@
     "migrate:patrols": "node scripts/migrateMemberPatrols.js",
     "migrate:member-roles": "node scripts/migrateMemberRoles.js",
     "import:members": "node scripts/importWorkbookMembers.js",
+    "migrate:member-identities": "node scripts/migrateMemberIdentities.js",
     "sync:events": "node scripts/syncEventStatuses.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
+    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "mongoose": "^8.15.0",
     "morgan": "^1.10.0",

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 export const PATROLS = ["Fox", "Dove", "Bull", "Peacock", "Officers", "Mentor", "MPL", "Rhino", "Turtle", "Sleeping", "NRI"];
 export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
-export const SHARED_IMPORT_EMAIL = "azizshada@gmail.com";
+export const generateMemberId = () => String(crypto.randomInt(10_000_000, 100_000_000));
 
 const imageSchema = new mongoose.Schema({
   fileName: String,
@@ -11,6 +11,13 @@ const imageSchema = new mongoose.Schema({
 }, { _id: false });
 
 const memberSchema = new mongoose.Schema({
+  memberId: {
+    type: String,
+    required: true,
+    unique: true,
+    match: [/^\d{8}$/, "Member ID must contain exactly 8 digits"],
+    default: generateMemberId,
+  },
   name: {
     type: String,
     required: true,
@@ -24,7 +31,6 @@ const memberSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
-  loginEmailKey: { type: String, select: false, unique: true, sparse: true },
   patrol: {
     type: String,
     required: true,
@@ -55,9 +61,9 @@ const memberSchema = new mongoose.Schema({
   lastLoginAt: Date,
 }, { timestamps: true });
 
+memberSchema.index({ email: 1 }, { unique: true, sparse: true });
 memberSchema.index({ phone: 1 }, { unique: true, sparse: true });
 memberSchema.pre("validate", function assignUniqueRoleKeys() {
-  this.loginEmailKey = this.email && this.email !== SHARED_IMPORT_EMAIL ? this.email : undefined;
   this.patrolLeaderKey = this.isPatrolLeader ? this.patrol : undefined;
   this.bandInspectorKey = this.instrument === "Band Inspector" ? "Band Inspector" : undefined;
 });

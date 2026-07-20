@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import AdminUser from "../models/AdminUser.js";
-import Member, { SHARED_IMPORT_EMAIL } from "../models/Member.js";
+import Member from "../models/Member.js";
 import { createToken } from "../utils/token.js";
 import httpError from "../utils/httpError.js";
 import { sendPasswordOtp } from "../services/emailService.js";
@@ -8,11 +8,6 @@ import { sendPasswordOtp } from "../services/emailService.js";
 const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
 const otpFields = "+passwordHash +passwordSalt +otpHash +otpSalt +otpExpiresAt +otpRequestedAt +otpAttempts";
 const genericResetMessage = "If an active account matches that email, a verification code has been sent";
-const requirePersonalMemberEmail = (email) => {
-  if (email === SHARED_IMPORT_EMAIL) {
-    throw httpError(409, "Ask an administrator to assign your personal email before activating or signing in");
-  }
-};
 
 function createOtp(account) {
   const otp = String(crypto.randomInt(100000, 1000000));
@@ -69,7 +64,6 @@ export async function requestMemberOtp(req, res) {
   const email = req.body.email?.trim().toLowerCase();
   const phone = normalizePhone(req.body.phone);
   if (!email || !phone) throw httpError(400, "Registered email and phone number are required");
-  requirePersonalMemberEmail(email);
   const member = await Member.findOne({ email, status: "active" }).select(otpFields);
   if (!member || normalizePhone(member.phone) !== phone) throw httpError(404, "No active member matches that email and phone number");
   if (member.otpRequestedAt && Date.now() - member.otpRequestedAt.getTime() < 60_000) {
@@ -92,7 +86,6 @@ export async function setMemberPassword(req, res) {
   const otp = String(req.body.otp || "").trim();
   const password = String(req.body.password || "");
   if (!email || !phone || !/^\d{6}$/.test(otp)) throw httpError(400, "Email, phone and a six-digit verification code are required");
-  requirePersonalMemberEmail(email);
   if (password.length < 8) throw httpError(400, "Password must be at least 8 characters");
   const member = await Member.findOne({ email, status: "active" }).select(otpFields);
   if (!member || normalizePhone(member.phone) !== phone) throw httpError(404, "Member not found");
@@ -112,7 +105,6 @@ export async function memberLogin(req, res) {
   const email = req.body.email?.trim().toLowerCase();
   const password = String(req.body.password || "");
   if (!email || !password) throw httpError(400, "Email and password are required");
-  requirePersonalMemberEmail(email);
   const member = await Member.findOne({ email }).select("+passwordHash +passwordSalt");
   if (member?.status === "inactive") throw httpError(403, "This member is inactive (sleeping) and cannot sign in. Contact an administrator");
   if (!member?.passwordHash) throw httpError(403, "Set your member password before signing in");
@@ -127,7 +119,6 @@ export async function requestPasswordReset(req, res) {
   const email = req.body.email?.trim().toLowerCase();
   const role = req.body.role === "member" ? "member" : req.body.role === "admin" ? "admin" : null;
   if (!email || !role) throw httpError(400, "Email and account type are required");
-  if (role === "member") requirePersonalMemberEmail(email);
   const account = role === "member"
     ? await Member.findOne({ email, status: "active" }).select(otpFields)
     : await AdminUser.findOne({ email, active: true }).select(otpFields);
@@ -145,7 +136,6 @@ export async function resetPassword(req, res) {
   const otp = String(req.body.otp || "").trim();
   const password = String(req.body.password || "");
   if (!email || !role || !/^\d{6}$/.test(otp)) throw httpError(400, "Email, account type and a six-digit verification code are required");
-  if (role === "member") requirePersonalMemberEmail(email);
   if (password.length < 8) throw httpError(400, "Password must be at least 8 characters");
   const account = role === "member"
     ? await Member.findOne({ email, status: "active" }).select(otpFields)

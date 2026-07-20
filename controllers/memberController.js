@@ -1,17 +1,19 @@
 import fs from "fs/promises";
 import path from "path";
+import ExcelJS from "exceljs";
 import Member, { INSTRUMENTS, PATROLS } from "../models/Member.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 
-const fields = ["name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
+const fields = ["memberId", "name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
 const isTrue = (value) => value === true || value === "true";
 const uniqueRoleError = (error) => {
-  if (error?.code === 11000 && error?.keyPattern?.loginEmailKey) {
+  if (error?.code === 11000 && error?.keyPattern?.email) {
     return httpError(409, "Another member is already registered with this email address");
   }
+  if (error?.code === 11000 && error?.keyPattern?.memberId) return httpError(409, "Another member already uses this member ID");
   if (error?.code !== 11000) return error;
   if (error.keyPattern?.patrolLeaderKey) return httpError(409, "This patrol already has a patrol leader");
   if (error.keyPattern?.bandInspectorKey) return httpError(409, "Band Inspector is already assigned to another member");
@@ -87,8 +89,74 @@ export async function listMembers(req, res) {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   if (req.query.patrol) filter.patrol = req.query.patrol;
+  if (req.query.faceEnrolled === "true" || req.query.faceEnrolled === "false") filter.faceEnrolled = req.query.faceEnrolled === "true";
   const members = await Member.find(filter).sort({ createdAt: -1 });
   res.json({ success: true, members });
+}
+
+export async function exportMembers(req, res) {
+  const members = await Member.find().sort({ name: 1 });
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Saifee Rovers";
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet("Members", {
+    views: [{ state: "frozen", ySplit: 3, showGridLines: false }],
+    pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1 },
+  });
+
+  sheet.mergeCells("A1:J1");
+  const title = sheet.getCell("A1");
+  title.value = "Saifee Rovers Member Directory";
+  title.font = { name: "Aptos Display", size: 20, bold: true, color: { argb: "FFFFFFFF" } };
+  title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1565C0" } };
+  title.alignment = { vertical: "middle", horizontal: "left" };
+  sheet.getRow(1).height = 34;
+
+  sheet.mergeCells("A2:J2");
+  const subtitle = sheet.getCell("A2");
+  subtitle.value = `Generated ${new Date().toLocaleString("en-IN")} • ${members.length} members`;
+  subtitle.font = { name: "Aptos", size: 10, color: { argb: "FF475569" } };
+  subtitle.alignment = { vertical: "middle" };
+  sheet.getRow(2).height = 23;
+
+  sheet.columns = [
+    { key: "memberId", width: 14 }, { key: "name", width: 30 }, { key: "email", width: 36 },
+    { key: "phone", width: 16 }, { key: "patrol", width: 15 }, { key: "role", width: 16 },
+    { key: "instrument", width: 18 }, { key: "status", width: 13 }, { key: "face", width: 18 },
+    { key: "createdAt", width: 16 },
+  ];
+  const headers = ["Member ID", "Full Name", "Email", "Phone", "Patrol", "Patrol Role", "Instrument", "Status", "Face Enrollment", "Registered On"];
+  sheet.getRow(3).values = headers;
+  sheet.getRow(3).height = 26;
+  sheet.getRow(3).eachCell((cell) => {
+    cell.font = { name: "Aptos", bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F3D6E" } };
+    cell.alignment = { vertical: "middle" };
+    cell.border = { bottom: { style: "medium", color: { argb: "FF0B294A" } } };
+  });
+
+  for (const member of members) {
+    const row = sheet.addRow({
+      memberId: member.memberId, name: member.name, email: member.email, phone: member.phone,
+      patrol: member.patrol, role: member.isPatrolLeader ? "Patrol Leader" : "Member",
+      instrument: member.instrument || "Not assigned", status: member.status === "inactive" ? "Inactive" : "Active",
+      face: member.faceEnrolled ? "Enrolled" : "Not Enrolled", createdAt: member.createdAt,
+    });
+    row.height = 22;
+    row.font = { name: "Aptos", size: 10 };
+    row.alignment = { vertical: "middle" };
+    if (row.number % 2 === 0) row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F7FC" } };
+    row.eachCell((cell) => { cell.border = { bottom: { style: "hair", color: { argb: "FFD7E0EA" } } }; });
+  }
+  sheet.getColumn("memberId").numFmt = "@";
+  sheet.getColumn("phone").numFmt = "@";
+  sheet.getColumn("createdAt").numFmt = "dd-mmm-yyyy";
+  sheet.autoFilter = { from: "A3", to: `J${Math.max(3, members.length + 3)}` };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="saifee-rovers-members-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+  res.send(Buffer.from(buffer));
 }
 
 export async function getMember(req, res) {

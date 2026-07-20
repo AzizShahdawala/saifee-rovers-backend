@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs/promises";
 import mongoose from "mongoose";
-import Member, { SHARED_IMPORT_EMAIL } from "../models/Member.js";
+import Member, { generateMemberId } from "../models/Member.js";
 
 if (!process.env.MONGO_URI) throw new Error("MONGO_URI is not configured");
 
@@ -11,20 +11,14 @@ const members = JSON.parse(await fs.readFile(sourceUrl, "utf8"));
 await mongoose.connect(process.env.MONGO_URI);
 
 try {
-  const emailIndex = (await Member.collection.indexes()).find((index) => index.name === "email_1");
-  if (emailIndex?.unique) await Member.collection.dropIndex("email_1");
-
-  const existingMembers = await Member.find().select("+loginEmailKey");
-  for (const member of existingMembers) await member.save();
-  await Member.syncIndexes();
-
   const operations = members.map(({ name, phone, patrol }) => ({
     updateOne: {
       filter: { phone },
       update: {
         $set: { name, patrol },
         $setOnInsert: {
-          email: SHARED_IMPORT_EMAIL,
+          memberId: generateMemberId(),
+          email: `member.${phone}@saifeerovers.local`,
           instrument: "Saxophone",
           isPatrolLeader: false,
           status: patrol === "Sleeping" ? "inactive" : "active",
