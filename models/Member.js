@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
 
-export const PATROLS = ["Fox", "Dove", "Bull", "Peacock", "Officers", "Mentor", "MPL", "Rhino", "Turtle", "Sleeping", "NRI"];
+export const PATROLS = ["FOX", "DOVE", "BULL", "PEACOCK", "OFFICERS", "MENTOR", "MPL", "RHINO", "TURTLE", "SLEEPING", "NRI"];
 export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
 export const generateMemberId = () => String(crypto.randomInt(10_000_000, 100_000_000));
 
@@ -11,11 +11,11 @@ const imageSchema = new mongoose.Schema({
 }, { _id: false });
 
 const memberSchema = new mongoose.Schema({
-  memberId: {
+  itsId: {
     type: String,
     required: true,
     unique: true,
-    match: [/^\d{8}$/, "Member ID must contain exactly 8 digits"],
+    match: [/^\d{8}$/, "ITS ID must contain exactly 8 digits"],
     default: generateMemberId,
   },
   name: {

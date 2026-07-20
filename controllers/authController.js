@@ -36,6 +36,7 @@ function clearOtp(account) {
 }
 const publicMember = (member) => ({
   id: member._id,
+  itsId: member.itsId,
   name: member.name,
   email: member.email,
   phone: member.phone,

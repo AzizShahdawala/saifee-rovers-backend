@@ -6,14 +6,14 @@ import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 
-const fields = ["memberId", "name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
+const fields = ["itsId", "name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
 const isTrue = (value) => value === true || value === "true";
 const uniqueRoleError = (error) => {
   if (error?.code === 11000 && error?.keyPattern?.email) {
     return httpError(409, "Another member is already registered with this email address");
   }
-  if (error?.code === 11000 && error?.keyPattern?.memberId) return httpError(409, "Another member already uses this member ID");
+  if (error?.code === 11000 && error?.keyPattern?.itsId) return httpError(409, "Another member already uses this ITS ID");
   if (error?.code !== 11000) return error;
   if (error.keyPattern?.patrolLeaderKey) return httpError(409, "This patrol already has a patrol leader");
   if (error.keyPattern?.bandInspectorKey) return httpError(409, "Band Inspector is already assigned to another member");
@@ -41,7 +41,7 @@ export async function registerMember(req, res) {
     throw httpError(400, "Face enrollment requires all 5 images, or it can be skipped");
   }
   const data = memberBody(req.body);
-  if (!data.name || !data.phone || !data.email || !data.patrol || (data.patrol !== "Officers" && !data.instrument)) throw httpError(400, "Name, phone, email and patrol are required; instrument is required unless the patrol is Officers");
+  if (!data.name || !data.phone || !data.email || !data.patrol || (data.patrol !== "OFFICERS" && !data.instrument)) throw httpError(400, "Name, phone, email and patrol are required; instrument is required unless the patrol is OFFICERS");
   try {
     await ensureUniqueRoles(data);
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
@@ -120,12 +120,12 @@ export async function exportMembers(req, res) {
   sheet.getRow(2).height = 23;
 
   sheet.columns = [
-    { key: "memberId", width: 14 }, { key: "name", width: 30 }, { key: "email", width: 36 },
+    { key: "itsId", width: 14 }, { key: "name", width: 30 }, { key: "email", width: 36 },
     { key: "phone", width: 16 }, { key: "patrol", width: 15 }, { key: "role", width: 16 },
     { key: "instrument", width: 18 }, { key: "status", width: 13 }, { key: "face", width: 18 },
     { key: "createdAt", width: 16 },
   ];
-  const headers = ["Member ID", "Full Name", "Email", "Phone", "Patrol", "Patrol Role", "Instrument", "Status", "Face Enrollment", "Registered On"];
+  const headers = ["ITS ID", "Full Name", "Email", "Phone", "Patrol", "Patrol Role", "Instrument", "Status", "Face Enrollment", "Registered On"];
   sheet.getRow(3).values = headers;
   sheet.getRow(3).height = 26;
   sheet.getRow(3).eachCell((cell) => {
@@ -137,7 +137,7 @@ export async function exportMembers(req, res) {
 
   for (const member of members) {
     const row = sheet.addRow({
-      memberId: member.memberId, name: member.name, email: member.email, phone: member.phone,
+      itsId: member.itsId, name: member.name, email: member.email, phone: member.phone,
       patrol: member.patrol, role: member.isPatrolLeader ? "Patrol Leader" : "Member",
       instrument: member.instrument || "Not assigned", status: member.status === "inactive" ? "Inactive" : "Active",
       face: member.faceEnrolled ? "Enrolled" : "Not Enrolled", createdAt: member.createdAt,
@@ -148,7 +148,7 @@ export async function exportMembers(req, res) {
     if (row.number % 2 === 0) row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F7FC" } };
     row.eachCell((cell) => { cell.border = { bottom: { style: "hair", color: { argb: "FFD7E0EA" } } }; });
   }
-  sheet.getColumn("memberId").numFmt = "@";
+  sheet.getColumn("itsId").numFmt = "@";
   sheet.getColumn("phone").numFmt = "@";
   sheet.getColumn("createdAt").numFmt = "dd-mmm-yyyy";
   sheet.autoFilter = { from: "A3", to: `J${Math.max(3, members.length + 3)}` };
@@ -176,7 +176,7 @@ export async function updateMember(req, res) {
   }
   const data = memberBody(req.body);
   const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader };
-  if (next.patrol !== "Officers" && !next.instrument) throw httpError(400, "Instrument is required unless the patrol is Officers");
+  if (next.patrol !== "OFFICERS" && !next.instrument) throw httpError(400, "Instrument is required unless the patrol is OFFICERS");
   await ensureUniqueRoles({ ...next, excludeId: member._id });
   member.set(data);
   try {

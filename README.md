@@ -48,7 +48,7 @@ Registration processes the five webcam photos and stores an averaged normalized 
 
 Attendance has a unique member/event constraint, preventing duplicate check-ins. Deleting a member or event also removes its attendance records.
 
-Member patrols are restricted to Fox, Dove, Bull, and Peacock. Run `npm run migrate:patrols` after upgrading an existing database; the migration normalizes patrol values, initializes `isPatrolLeader`, and creates the one-active-leader-per-patrol index.
+Member patrols use uppercase values: FOX, DOVE, BULL, PEACOCK, OFFICERS, MENTOR, MPL, RHINO, TURTLE, SLEEPING, and NRI. Run `npm run migrate:patrols` after upgrading an existing database; the migration normalizes patrol values, initializes `isPatrolLeader`, and creates the one-active-leader-per-patrol index.
 
 Member portal endpoints require a member JWT. First-time member activation and both admin/member password resets use six-digit email codes. Codes are never returned by the API.
 

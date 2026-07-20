@@ -11,17 +11,19 @@ const members = JSON.parse(await fs.readFile(sourceUrl, "utf8"));
 await mongoose.connect(process.env.MONGO_URI);
 
 try {
-  const operations = members.map(({ name, phone, patrol }) => ({
+  const operations = members.map(({ name, phone, patrol: sourcePatrol }) => {
+    const patrol = sourcePatrol.toUpperCase();
+    return ({
     updateOne: {
       filter: { phone },
       update: {
         $set: { name, patrol },
         $setOnInsert: {
-          memberId: generateMemberId(),
+          itsId: generateMemberId(),
           email: `member.${phone}@saifeerovers.local`,
           instrument: "Saxophone",
           isPatrolLeader: false,
-          status: patrol === "Sleeping" ? "inactive" : "active",
+          status: patrol === "SLEEPING" ? "inactive" : "active",
           faceEnrolled: false,
           images: [],
         },
@@ -29,7 +31,8 @@ try {
       upsert: true,
       runValidators: true,
     },
-  }));
+    });
+  });
 
   const result = await Member.bulkWrite(operations, { ordered: true });
   const importedPhones = members.map(({ phone }) => phone);
