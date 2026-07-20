@@ -9,6 +9,19 @@ import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 const fields = ["itsId", "name", "phone", "email", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
 const isTrue = (value) => value === true || value === "true";
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const memberFilter = (query = {}) => {
+  const filter = {};
+  if (["active", "inactive"].includes(query.status)) filter.status = query.status;
+  if (PATROLS.includes(query.patrol?.toUpperCase())) filter.patrol = query.patrol.toUpperCase();
+  if (query.faceEnrolled === "true" || query.faceEnrolled === "false") filter.faceEnrolled = query.faceEnrolled === "true";
+  const search = String(query.search || "").trim();
+  if (search) {
+    const pattern = new RegExp(escapeRegex(search), "i");
+    filter.$or = ["itsId", "name", "email", "phone", "patrol", "instrument"].map((field) => ({ [field]: pattern }));
+  }
+  return filter;
+};
 const uniqueRoleError = (error) => {
   if (error?.code === 11000 && error?.keyPattern?.email) {
     return httpError(409, "Another member is already registered with this email address");
@@ -86,16 +99,12 @@ export async function enrollMemberFace(req, res) {
 }
 
 export async function listMembers(req, res) {
-  const filter = {};
-  if (req.query.status) filter.status = req.query.status;
-  if (req.query.patrol) filter.patrol = req.query.patrol;
-  if (req.query.faceEnrolled === "true" || req.query.faceEnrolled === "false") filter.faceEnrolled = req.query.faceEnrolled === "true";
-  const members = await Member.find(filter).sort({ createdAt: -1 });
+  const members = await Member.find(memberFilter(req.query)).sort({ createdAt: -1 });
   res.json({ success: true, members });
 }
 
 export async function exportMembers(req, res) {
-  const members = await Member.find().sort({ name: 1 });
+  const members = await Member.find(memberFilter(req.query)).sort({ name: 1 });
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Saifee Rovers";
   workbook.created = new Date();
