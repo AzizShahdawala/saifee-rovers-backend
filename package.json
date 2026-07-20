@@ -14,6 +14,7 @@
     "import:members": "node scripts/importWorkbookMembers.js",
     "migrate:member-identities": "node scripts/migrateMemberIdentities.js",
     "migrate:member-profiles": "node scripts/migrateMemberProfiles.js",
+    "migrate:member-families": "node scripts/migrateMemberFamilies.js",
     "sync:events": "node scripts/syncEventStatuses.js"
   },
   "dependencies": {

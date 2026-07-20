@@ -6,8 +6,13 @@ import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 
-const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "profession", "professionDetails", "patrol", "instrument", "status", "isPatrolLeader"];
-const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
+const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "profession", "professionDetails", "maritalStatus", "spouseName", "spouseDateOfBirth", "children", "patrol", "instrument", "status", "isPatrolLeader"];
+const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => {
+  if (key === "children" && typeof body[key] === "string") {
+    try { return [key, JSON.parse(body[key])]; } catch { throw httpError(400, "Children details are invalid"); }
+  }
+  return [key, typeof body[key] === "string" ? body[key].trim() : body[key]];
+}));
 const isTrue = (value) => value === true || value === "true";
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const memberFilter = (query = {}) => {
@@ -54,6 +59,20 @@ function validatePersonalDetails({ dateOfBirth, profession, professionDetails })
   if (profession !== "RETIRED" && !String(professionDetails || "").trim()) throw httpError(400, "Profession details are required for the selected profession");
 }
 
+function validateFamilyDetails({ maritalStatus, spouseName, spouseDateOfBirth, children = [] }) {
+  if (!["MARRIED", "UNMARRIED"].includes(maritalStatus)) throw httpError(400, "Marital status must be Married or Unmarried");
+  if (maritalStatus === "MARRIED") {
+    const spouseBirthDate = new Date(spouseDateOfBirth);
+    if (!String(spouseName || "").trim()) throw httpError(400, "Spouse name is required for married members");
+    if (!spouseDateOfBirth || Number.isNaN(spouseBirthDate.getTime()) || spouseBirthDate > new Date()) throw httpError(400, "A valid spouse date of birth is required and cannot be in the future");
+  }
+  if (!Array.isArray(children)) throw httpError(400, "Children details must be a list");
+  for (const child of children) {
+    const birthDate = new Date(child?.dateOfBirth);
+    if (!String(child?.name || "").trim() || !child?.dateOfBirth || Number.isNaN(birthDate.getTime()) || birthDate > new Date()) throw httpError(400, "Each child requires a name and valid date of birth");
+  }
+}
+
 export async function registerMember(req, res) {
   const enrollmentFiles = req.files || [];
   if (![0, 5].includes(enrollmentFiles.length)) {
@@ -64,6 +83,8 @@ export async function registerMember(req, res) {
   if (!data.name || !data.phone || !data.email || !data.patrol || (data.patrol !== "OFFICERS" && !data.instrument)) throw httpError(400, "Name, phone, email and patrol are required; instrument is required unless the patrol is OFFICERS");
   try {
     validatePersonalDetails(data);
+    validateFamilyDetails(data);
+    if (data.maritalStatus === "UNMARRIED") Object.assign(data, { spouseName: "", spouseDateOfBirth: null, children: [] });
     await ensureUniqueRoles(data);
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
     const member = await Member.create({
@@ -121,7 +142,7 @@ export async function exportMembers(req, res) {
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1 },
   });
 
-  sheet.mergeCells("A1:M1");
+  sheet.mergeCells("A1:Q1");
   const title = sheet.getCell("A1");
   title.value = "Saifee Rovers Member Directory";
   title.font = { name: "Aptos Display", size: 20, bold: true, color: { argb: "FFFFFFFF" } };
@@ -129,7 +150,7 @@ export async function exportMembers(req, res) {
   title.alignment = { vertical: "middle", horizontal: "left" };
   sheet.getRow(1).height = 34;
 
-  sheet.mergeCells("A2:M2");
+  sheet.mergeCells("A2:Q2");
   const subtitle = sheet.getCell("A2");
   subtitle.value = `Generated ${new Date().toLocaleString("en-IN")} • ${members.length} members`;
   subtitle.font = { name: "Aptos", size: 10, color: { argb: "FF475569" } };
@@ -140,10 +161,11 @@ export async function exportMembers(req, res) {
     { key: "itsId", width: 14 }, { key: "name", width: 30 }, { key: "email", width: 36 },
     { key: "phone", width: 16 }, { key: "dateOfBirth", width: 16 }, { key: "profession", width: 16 },
     { key: "professionDetails", width: 34 }, { key: "patrol", width: 15 }, { key: "role", width: 16 },
+    { key: "maritalStatus", width: 16 }, { key: "spouseName", width: 24 }, { key: "spouseDateOfBirth", width: 18 }, { key: "children", width: 42 },
     { key: "instrument", width: 18 }, { key: "status", width: 13 }, { key: "face", width: 18 },
     { key: "createdAt", width: 16 },
   ];
-  const headers = ["ITS ID", "Full Name", "Email", "Phone", "Date of Birth", "Profession", "Profession Details", "Patrol", "Patrol Role", "Instrument", "Status", "Face Enrollment", "Registered On"];
+  const headers = ["ITS ID", "Full Name", "Email", "Phone", "Date of Birth", "Profession", "Profession Details", "Patrol", "Patrol Role", "Marital Status", "Spouse Name", "Spouse Date of Birth", "Children", "Instrument", "Status", "Face Enrollment", "Registered On"];
   sheet.getRow(3).values = headers;
   sheet.getRow(3).height = 26;
   sheet.getRow(3).eachCell((cell) => {
@@ -158,6 +180,8 @@ export async function exportMembers(req, res) {
       itsId: member.itsId, name: member.name, email: member.email, phone: member.phone,
       dateOfBirth: member.dateOfBirth, profession: member.profession, professionDetails: member.professionDetails || "Not applicable",
       patrol: member.patrol, role: member.isPatrolLeader ? "Patrol Leader" : "Member",
+      maritalStatus: member.maritalStatus === "MARRIED" ? "Married" : "Unmarried", spouseName: member.spouseName || "Not applicable", spouseDateOfBirth: member.spouseDateOfBirth || null,
+      children: member.children?.length ? member.children.map((child) => `${child.name} (${new Date(child.dateOfBirth).toLocaleDateString("en-IN")})`).join("; ") : "None",
       instrument: member.instrument || "Not assigned", status: member.status === "inactive" ? "Inactive" : "Active",
       face: member.faceEnrolled ? "Enrolled" : "Not Enrolled", createdAt: member.createdAt,
     });
@@ -170,8 +194,9 @@ export async function exportMembers(req, res) {
   sheet.getColumn("itsId").numFmt = "@";
   sheet.getColumn("phone").numFmt = "@";
   sheet.getColumn("dateOfBirth").numFmt = "dd-mmm-yyyy";
+  sheet.getColumn("spouseDateOfBirth").numFmt = "dd-mmm-yyyy";
   sheet.getColumn("createdAt").numFmt = "dd-mmm-yyyy";
-  sheet.autoFilter = { from: "A3", to: `M${Math.max(3, members.length + 3)}` };
+  sheet.autoFilter = { from: "A3", to: `Q${Math.max(3, members.length + 3)}` };
 
   const buffer = await workbook.xlsx.writeBuffer();
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -195,9 +220,11 @@ export async function updateMember(req, res) {
     }
   }
   const data = memberBody(req.body);
-  const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, dateOfBirth: data.dateOfBirth ?? member.dateOfBirth, profession: data.profession ?? member.profession, professionDetails: data.professionDetails ?? member.professionDetails };
+  const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, dateOfBirth: data.dateOfBirth ?? member.dateOfBirth, profession: data.profession ?? member.profession, professionDetails: data.professionDetails ?? member.professionDetails, maritalStatus: data.maritalStatus ?? member.maritalStatus, spouseName: data.spouseName ?? member.spouseName, spouseDateOfBirth: data.spouseDateOfBirth ?? member.spouseDateOfBirth, children: data.children ?? member.children };
   if (next.patrol !== "OFFICERS" && !next.instrument) throw httpError(400, "Instrument is required unless the patrol is OFFICERS");
   validatePersonalDetails(next);
+  validateFamilyDetails(next);
+  if (next.maritalStatus === "UNMARRIED") Object.assign(data, { spouseName: "", spouseDateOfBirth: null, children: [] });
   await ensureUniqueRoles({ ...next, excludeId: member._id });
   member.set(data);
   try {

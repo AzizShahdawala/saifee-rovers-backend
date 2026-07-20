@@ -11,6 +11,11 @@ const imageSchema = new mongoose.Schema({
   path: String,
 }, { _id: false });
 
+const childSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  dateOfBirth: { type: Date, required: true },
+}, { _id: true });
+
 const memberSchema = new mongoose.Schema({
   itsId: {
     type: String,
@@ -35,6 +40,10 @@ const memberSchema = new mongoose.Schema({
   dateOfBirth: { type: Date, required: true },
   profession: { type: String, required: true, enum: PROFESSIONS },
   professionDetails: { type: String, trim: true, default: "" },
+  maritalStatus: { type: String, required: true, enum: ["MARRIED", "UNMARRIED"] },
+  spouseName: { type: String, trim: true, default: "" },
+  spouseDateOfBirth: Date,
+  children: { type: [childSchema], default: [] },
   patrol: {
     type: String,
     required: true,
