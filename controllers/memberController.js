@@ -36,7 +36,7 @@ export async function registerMember(req, res) {
     throw httpError(400, "Face enrollment requires all 5 images, or it can be skipped");
   }
   const data = memberBody(req.body);
-  if (!data.name || !data.phone || !data.email || !data.patrol || !data.instrument) throw httpError(400, "Name, phone, email, patrol and instrument are required");
+  if (!data.name || !data.phone || !data.email || !data.patrol || (data.patrol !== "Officers" && !data.instrument)) throw httpError(400, "Name, phone, email and patrol are required; instrument is required unless the patrol is Officers");
   try {
     await ensureUniqueRoles(data);
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
@@ -105,7 +105,7 @@ export async function updateMember(req, res) {
   }
   const data = memberBody(req.body);
   const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader };
-  if (!next.instrument) throw httpError(400, "Instrument is required");
+  if (next.patrol !== "Officers" && !next.instrument) throw httpError(400, "Instrument is required unless the patrol is Officers");
   await ensureUniqueRoles({ ...next, excludeId: member._id });
   member.set(data);
   try {
