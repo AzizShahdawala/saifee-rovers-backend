@@ -9,6 +9,9 @@ const fields = ["name", "phone", "email", "patrol", "instrument", "status", "isP
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => [key, typeof body[key] === "string" ? body[key].trim() : body[key]]));
 const isTrue = (value) => value === true || value === "true";
 const uniqueRoleError = (error) => {
+  if (error?.code === 11000 && error?.keyPattern?.loginEmailKey) {
+    return httpError(409, "Another member is already registered with this email address");
+  }
   if (error?.code !== 11000) return error;
   if (error.keyPattern?.patrolLeaderKey) return httpError(409, "This patrol already has a patrol leader");
   if (error.keyPattern?.bandInspectorKey) return httpError(409, "Band Inspector is already assigned to another member");
