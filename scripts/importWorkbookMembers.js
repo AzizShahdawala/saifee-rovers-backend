@@ -21,6 +21,9 @@ try {
         $setOnInsert: {
           itsId: generateMemberId(),
           email: `member.${phone}@saifeerovers.local`,
+          dateOfBirth: new Date(Date.UTC(1970 + Number(phone.slice(-2)) % 30, Number(phone.slice(-4, -2)) % 12, 1 + Number(phone.slice(-6, -4)) % 28)),
+          profession: "OTHER",
+          professionDetails: `Imported member placeholder ${phone}`,
           instrument: "Saxophone",
           isPatrolLeader: false,
           status: patrol === "SLEEPING" ? "inactive" : "active",

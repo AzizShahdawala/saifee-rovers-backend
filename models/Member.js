@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 export const PATROLS = ["FOX", "DOVE", "BULL", "PEACOCK", "OFFICERS", "MENTOR", "MPL", "RHINO", "TURTLE", "SLEEPING", "NRI"];
 export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
+export const PROFESSIONS = ["BUSINESS", "JOB", "STUDENT", "RETIRED", "OTHER"];
 export const generateMemberId = () => String(crypto.randomInt(10_000_000, 100_000_000));
 
 const imageSchema = new mongoose.Schema({
@@ -31,6 +32,9 @@ const memberSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  dateOfBirth: { type: Date, required: true },
+  profession: { type: String, required: true, enum: PROFESSIONS },
+  professionDetails: { type: String, trim: true, default: "" },
   patrol: {
     type: String,
     required: true,
