@@ -30,23 +30,53 @@ async function ensureUniqueRoles({ patrol, isPatrolLeader, instrument, excludeId
 }
 
 export async function registerMember(req, res) {
-  if (!req.files || req.files.length !== 5) throw httpError(400, "Exactly 5 images are required");
+  const enrollmentFiles = req.files || [];
+  if (![0, 5].includes(enrollmentFiles.length)) {
+    if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    throw httpError(400, "Face enrollment requires all 5 images, or it can be skipped");
+  }
   const data = memberBody(req.body);
   if (!data.name || !data.phone || !data.email || !data.patrol || !data.instrument) throw httpError(400, "Name, phone, email, patrol and instrument are required");
   try {
     await ensureUniqueRoles(data);
-    const { descriptor } = await enrollmentDescriptor(req.files.map((file) => file.path));
+    const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
     const member = await Member.create({
       ...data,
-      folder: req.memberFolder,
-      images: req.files.map((file) => ({ fileName: file.filename, path: file.path })),
-      faceEnrolled: true,
+      folder: enrollmentFiles.length ? req.memberFolder : undefined,
+      images: enrollmentFiles.map((file) => ({ fileName: file.filename, path: file.path })),
+      faceEnrolled: enrollmentFiles.length === 5,
       descriptor,
     });
     res.status(201).json({ success: true, member });
   } catch (error) {
     if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
     throw uniqueRoleError(error);
+  }
+}
+
+export async function enrollMemberFace(req, res) {
+  if (!req.files || req.files.length !== 5) {
+    if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    throw httpError(400, "Exactly 5 face images are required for enrollment");
+  }
+  const member = await Member.findById(req.params.id);
+  if (!member) {
+    await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    throw httpError(404, "Member not found");
+  }
+  const previousFolder = member.folder;
+  try {
+    const { descriptor } = await enrollmentDescriptor(req.files.map((file) => file.path));
+    member.folder = req.memberFolder;
+    member.images = req.files.map((file) => ({ fileName: file.filename, path: file.path }));
+    member.faceEnrolled = true;
+    member.descriptor = descriptor;
+    await member.save();
+    if (previousFolder && previousFolder !== req.memberFolder) await fs.rm(path.join("uploads", "members", previousFolder), { recursive: true, force: true });
+    res.json({ success: true, message: "Face enrollment updated successfully", member });
+  } catch (error) {
+    await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    throw error;
   }
 }
 
