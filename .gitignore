@@ -9,3 +9,4 @@ uploads/events/
 ai/python/
 ai/__pycache__/
 .render/
+DEPLOYMENT.local.md
