@@ -4,8 +4,8 @@ import requireAuth, { requireRole } from "../middleware/auth.js";
 import { createPatrolScore, getPatrolScoreboard } from "../controllers/patrolScoreController.js";
 
 const router = express.Router();
-router.use(requireAuth, requireRole("admin"));
+router.use(requireAuth);
 router.get("/", asyncHandler(getPatrolScoreboard));
-router.post("/", asyncHandler(createPatrolScore));
+router.post("/", requireRole("admin"), asyncHandler(createPatrolScore));
 
 export default router;

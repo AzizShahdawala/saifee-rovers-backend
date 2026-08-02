@@ -10,6 +10,48 @@ const attendanceQuery = (memberId) => Attendance.find({ member: memberId })
   .populate("event", "title date startTime endTime venue agenda status")
   .populate("member", "name patrol images");
 
+const attendedStatuses = new Set(["present", "late"]);
+
+async function getMemberEventHistory(memberId) {
+  await syncEventStatuses();
+  const [events, attendance] = await Promise.all([
+    Event.find({ status: "completed" }).sort({ date: -1 }).lean(),
+    attendanceQuery(memberId),
+  ]);
+  const attendanceByEvent = new Map(
+    attendance.filter((record) => record.event?._id).map((record) => [String(record.event._id), record])
+  );
+  const history = events.map((event) => {
+    const record = attendanceByEvent.get(String(event._id));
+    const status = record?.status || "absent";
+    return {
+      _id: event._id,
+      event,
+      date: event.date,
+      attendanceId: record?._id || null,
+      status,
+      attended: attendedStatuses.has(status),
+      timestamp: record?.timestamp || null,
+      source: record?.source || null,
+      confidence: record?.confidence ?? null,
+    };
+  });
+  const attendedEvents = history.filter((item) => item.attended).length;
+  const excusedEvents = history.filter((item) => item.status === "excused").length;
+  const totalEvents = history.length;
+  return {
+    attendance,
+    history,
+    summary: {
+      totalEvents,
+      attendedEvents,
+      missedEvents: Math.max(totalEvents - attendedEvents - excusedEvents, 0),
+      excusedEvents,
+      attendanceRate: totalEvents ? Math.round((attendedEvents / totalEvents) * 100) : 0,
+    },
+  };
+}
+
 export async function getMemberProfile(req, res) {
   const member = await Member.findById(req.user.sub);
   if (!member || member.status !== "active") throw httpError(404, "Member profile not found");
@@ -44,8 +86,8 @@ export async function updateMemberProfilePhoto(req, res) {
 }
 
 export async function getMemberAttendance(req, res) {
-  const attendance = await attendanceQuery(req.user.sub);
-  res.json({ success: true, attendance });
+  const { history, summary } = await getMemberEventHistory(req.user.sub);
+  res.json({ success: true, attendance: history, summary });
 }
 
 export async function getMemberEvents(req, res) {
@@ -58,12 +100,9 @@ export async function getMemberEvents(req, res) {
 }
 
 export async function getMemberDashboard(req, res) {
-  await syncEventStatuses();
   const member = await Member.findById(req.user.sub);
   if (!member || member.status !== "active") throw httpError(404, "Member profile not found");
-  const attendance = await attendanceQuery(member._id);
-  const presentStatuses = new Set(["present", "late"]);
-  const attendedCount = attendance.filter((record) => presentStatuses.has(record.status)).length;
+  const { attendance, summary } = await getMemberEventHistory(member._id);
   const lateCount = attendance.filter((record) => record.status === "late").length;
   const upcomingEvents = await Event.find({ status: { $in: ["upcoming", "active", "ongoing"] } }).sort({ date: 1 }).limit(5);
   const monthlyMap = new Map();
@@ -75,10 +114,9 @@ export async function getMemberDashboard(req, res) {
     success: true,
     member,
     stats: {
+      ...summary,
       totalRecords: attendance.length,
-      attendedEvents: attendedCount,
       lateArrivals: lateCount,
-      attendanceRate: attendance.length ? Math.round((attendedCount / attendance.length) * 100) : 0,
     },
     recentAttendance: attendance.slice(0, 6),
     upcomingEvents,
