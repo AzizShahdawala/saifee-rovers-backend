@@ -108,7 +108,7 @@ export async function getMemberDashboard(req, res) {
   const monthlyMap = new Map();
   for (const record of attendance) {
     const key = new Date(record.timestamp).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
-    monthlyMap.set(key, (monthlyMap.get(key) || 0) + (presentStatuses.has(record.status) ? 1 : 0));
+    monthlyMap.set(key, (monthlyMap.get(key) || 0) + (attendedStatuses.has(record.status) ? 1 : 0));
   }
   res.json({
     success: true,
