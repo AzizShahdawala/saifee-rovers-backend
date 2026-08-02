@@ -25,6 +25,8 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_HOST
         value: smtp-relay.brevo.com
       - key: SMTP_PORT
@@ -33,3 +35,7 @@ services:
         value: "false"
       - key: EMAIL_FROM
         value: Saifee Rovers <webdevelopment5253@gmail.com>
+      - key: EMAIL_FROM_NAME
+        value: Saifee Rovers
+      - key: EMAIL_FROM_ADDRESS
+        value: webdevelopment5253@gmail.com

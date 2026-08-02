@@ -7,6 +7,10 @@ const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === 
 const smtpUser = String(process.env.SMTP_USER || "").trim();
 const smtpPassword = String(process.env.SMTP_PASSWORD || "").trim();
 const hasSmtpCredentials = () => Boolean(smtpHost && smtpPort && smtpUser && smtpPassword);
+const brevoApiKey = String(process.env.BREVO_API_KEY || "").trim();
+const senderEmail = process.env.EMAIL_FROM_ADDRESS || "webdevelopment5253@gmail.com";
+const senderName = process.env.EMAIL_FROM_NAME || "Saifee Rovers";
+const hasBrevoApiCredentials = () => Boolean(brevoApiKey && senderEmail);
 const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 
 function createTransport() {
@@ -55,17 +59,40 @@ function emailHtml({ name, otp, action }) {
 }
 
 export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
-  const transporter = createTransport();
   const action = purpose === "activation" ? "activate your member account" : "reset your password";
   const reference = crypto.randomBytes(3).toString("hex").toUpperCase();
   const subject = purpose === "activation" ? "Activate your Saifee Rovers account" : "Reset your Saifee Rovers password";
+  const text = `Hello ${name}, use verification code ${otp} to ${action}. It expires in 10 minutes. If you did not request this, ignore this email.`;
+  const html = emailHtml({ name, otp, action });
+
+  if (hasBrevoApiCredentials()) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { accept: "application/json", "api-key": brevoApiKey, "content-type": "application/json" },
+      body: JSON.stringify({
+        sender: { email: senderEmail, name: senderName },
+        to: [{ email, name }],
+        subject: `${subject} [${reference}]`,
+        textContent: text,
+        htmlContent: html,
+        headers: { "X-Entity-Ref-ID": reference },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Brevo email delivery failed (${response.status}): ${result.message || "Unknown error"}`);
+    console.info("Verification email accepted by Brevo API", { to: email, messageId: result.messageId });
+    return { messageId: result.messageId, accepted: [email], rejected: [] };
+  }
+
+  const transporter = createTransport();
   const info = await transporter.sendMail({
-    from: process.env.EMAIL_FROM || "Saifee Rovers <webdevelopment5253@gmail.com>",
+    from: process.env.EMAIL_FROM || `${senderName} <${senderEmail}>`,
     to: email,
     subject: `${subject} [${reference}]`,
     headers: { "X-Entity-Ref-ID": reference },
-    text: `Hello ${name}, use verification code ${otp} to ${action}. It expires in 10 minutes. If you did not request this, ignore this email.`,
-    html: emailHtml({ name, otp, action }),
+    text,
+    html,
   });
   if (!hasSmtpCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
   if (hasSmtpCredentials()) console.info("Verification email accepted", { to: email, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
@@ -73,6 +100,14 @@ export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
 }
 
 export async function verifyEmailTransport() {
+  if (hasBrevoApiCredentials()) {
+    const response = await fetch("https://api.brevo.com/v3/account", {
+      headers: { accept: "application/json", "api-key": brevoApiKey },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`Brevo API verification failed (${response.status})`);
+    return { configured: true, provider: "api.brevo.com", account: senderEmail };
+  }
   if (!hasSmtpCredentials()) return { configured: false };
   await createTransport().verify();
   return { configured: true, provider: smtpHost, account: smtpUser };
