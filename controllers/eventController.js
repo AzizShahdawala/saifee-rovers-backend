@@ -1,6 +1,7 @@
 import Event from "../models/Event.js";
 import Attendance from "../models/Attendance.js";
 import EventMedia from "../models/EventMedia.js";
+import { deleteStoredEventMedia } from "../services/eventMediaStorageService.js";
 import Member from "../models/Member.js";
 import fs from "fs/promises";
 import path from "path";
@@ -52,6 +53,8 @@ export async function deleteEvent(req, res) {
   const event = await Event.findByIdAndDelete(req.params.id);
   if (!event) throw httpError(404, "Event not found");
   await Attendance.deleteMany({ event: event._id });
+  const media = await EventMedia.find({ event: event._id });
+  await Promise.all(media.map(deleteStoredEventMedia));
   await EventMedia.deleteMany({ event: event._id });
   await fs.rm(path.join("uploads", "events", String(event._id)), { recursive: true, force: true });
   res.json({ success: true, message: "Event deleted" });
