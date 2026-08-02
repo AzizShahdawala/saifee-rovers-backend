@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 
-const gmailUser = process.env.SMTP_USER || "azizshada@gmail.com";
+const gmailUser = process.env.SMTP_USER || "webdevelopment5253@gmail.com";
 const gmailPassword = String(process.env.SMTP_PASSWORD || "").replace(/\s/g, "");
 const hasGmailCredentials = () => Boolean(gmailUser && gmailPassword);
 const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);

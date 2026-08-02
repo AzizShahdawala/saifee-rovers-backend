@@ -22,8 +22,8 @@ services:
       - key: EVENT_TIMEZONE_OFFSET_MINUTES
         value: "330"
       - key: SMTP_USER
-        value: azizshada@gmail.com
+        value: webdevelopment5253@gmail.com
       - key: SMTP_PASSWORD
         sync: false
       - key: EMAIL_FROM
-        value: Saifee Rovers <azizshada@gmail.com>
+        value: Saifee Rovers <webdevelopment5253@gmail.com>
