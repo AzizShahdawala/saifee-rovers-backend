@@ -1,22 +1,28 @@
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 
-const gmailUser = process.env.SMTP_USER || "webdevelopment5253@gmail.com";
-const gmailPassword = String(process.env.SMTP_PASSWORD || "").replace(/\s/g, "");
-const hasGmailCredentials = () => Boolean(gmailUser && gmailPassword);
+const smtpHost = process.env.SMTP_HOST || "smtp-relay.brevo.com";
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+const smtpUser = String(process.env.SMTP_USER || "").trim();
+const smtpPassword = String(process.env.SMTP_PASSWORD || "").trim();
+const hasSmtpCredentials = () => Boolean(smtpHost && smtpPort && smtpUser && smtpPassword);
 const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 
 function createTransport() {
-  if (hasGmailCredentials()) {
+  if (hasSmtpCredentials()) {
     return nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: gmailUser, pass: gmailPassword },
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      requireTLS: !smtpSecure,
+      auth: { user: smtpUser, pass: smtpPassword },
       connectionTimeout: 15_000,
       greetingTimeout: 10_000,
       socketTimeout: 30_000,
     });
   }
-  if (process.env.NODE_ENV === "production") throw new Error("Gmail delivery is not configured. Set SMTP_PASSWORD to a Google app password");
+  if (process.env.NODE_ENV === "production") throw new Error("Email delivery is not configured. Set the SMTP credentials");
   return nodemailer.createTransport({ streamTransport: true, newline: "unix", buffer: true });
 }
 
@@ -54,20 +60,20 @@ export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
   const reference = crypto.randomBytes(3).toString("hex").toUpperCase();
   const subject = purpose === "activation" ? "Activate your Saifee Rovers account" : "Reset your Saifee Rovers password";
   const info = await transporter.sendMail({
-    from: process.env.EMAIL_FROM || `Saifee Rovers <${gmailUser}>`,
+    from: process.env.EMAIL_FROM || "Saifee Rovers <webdevelopment5253@gmail.com>",
     to: email,
     subject: `${subject} [${reference}]`,
     headers: { "X-Entity-Ref-ID": reference },
     text: `Hello ${name}, use verification code ${otp} to ${action}. It expires in 10 minutes. If you did not request this, ignore this email.`,
     html: emailHtml({ name, otp, action }),
   });
-  if (!hasGmailCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
-  if (hasGmailCredentials()) console.info("Verification email accepted", { to: email, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
+  if (!hasSmtpCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
+  if (hasSmtpCredentials()) console.info("Verification email accepted", { to: email, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
   return { messageId: info.messageId, accepted: info.accepted || [], rejected: info.rejected || [] };
 }
 
 export async function verifyEmailTransport() {
-  if (!hasGmailCredentials()) return { configured: false };
+  if (!hasSmtpCredentials()) return { configured: false };
   await createTransport().verify();
-  return { configured: true, account: gmailUser };
+  return { configured: true, provider: smtpHost, account: smtpUser };
 }
