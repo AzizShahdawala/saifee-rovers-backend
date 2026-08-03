@@ -58,12 +58,14 @@ function emailHtml({ name, otp, action }) {
 </body></html>`;
 }
 
-async function sendTransactionalEmail({ email, name, subject, text, html, reference = crypto.randomBytes(3).toString("hex").toUpperCase() }) {
+async function sendTransactionalEmail({ email, name, subject, text, html, attachments = [], reference = crypto.randomBytes(3).toString("hex").toUpperCase() }) {
   if (hasBrevoApiCredentials()) {
+    const payload = { sender: { email: senderEmail, name: senderName }, to: [{ email, name }], subject, textContent: text, htmlContent: html, headers: { "X-Entity-Ref-ID": reference } };
+    if (attachments.length) payload.attachment = attachments.map((item) => ({ name: item.filename, content: Buffer.isBuffer(item.content) ? item.content.toString("base64") : item.content }));
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { accept: "application/json", "api-key": brevoApiKey, "content-type": "application/json" },
-      body: JSON.stringify({ sender: { email: senderEmail, name: senderName }, to: [{ email, name }], subject, textContent: text, htmlContent: html, headers: { "X-Entity-Ref-ID": reference } }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(30_000),
     });
     const result = await response.json().catch(() => ({}));
@@ -72,7 +74,7 @@ async function sendTransactionalEmail({ email, name, subject, text, html, refere
     return { messageId: result.messageId, accepted: [email], rejected: [] };
   }
   const transporter = createTransport();
-  const info = await transporter.sendMail({ from: process.env.EMAIL_FROM || `${senderName} <${senderEmail}>`, to: email, subject, headers: { "X-Entity-Ref-ID": reference }, text, html });
+  const info = await transporter.sendMail({ from: process.env.EMAIL_FROM || `${senderName} <${senderEmail}>`, to: email, subject, headers: { "X-Entity-Ref-ID": reference }, text, html, attachments });
   if (!hasSmtpCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
   return { messageId: info.messageId, accepted: info.accepted || [], rejected: info.rejected || [] };
 }
@@ -105,6 +107,15 @@ export async function sendBirthdayWish({ email, recipientName, celebrantName, re
   const subject = `Happy Birthday, ${celebrantName}!`;
   const text = `Happy Birthday, ${celebrantName}! Wishing you a wonderful year filled with happiness, success and memorable adventures. Warm wishes from Saifee Rovers.`;
   return sendTransactionalEmail({ email, name: recipientName, subject, text, html: birthdayHtml({ celebrantName, recipientName, relationship, patrol }) });
+}
+
+export async function sendReceiptEmail({ email, recipientName, receipt, pdfBuffer }) {
+  const subject = `Payment receipt ${receipt.receiptNumber} - Saifee Rovers`;
+  const amount = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(receipt.amount);
+  const paymentDate = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(receipt.paidOn));
+  const text = `Hello ${recipientName}, we have received your payment of ${amount} towards ${receipt.title} on ${paymentDate}. Your Saifee Rovers receipt ${receipt.receiptNumber} is attached.`;
+  const html = `<!doctype html><html lang="en"><body style="margin:0;background:#f6f1f9;font-family:Arial,Helvetica,sans-serif;color:#2b113f"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 12px 38px rgba(50,15,73,.14)"><tr><td style="padding:30px;text-align:center;background:#622599;color:#fff"><div style="font-size:24px;font-weight:800">SAIFEE ROVERS</div><div style="margin-top:6px;font-size:12px;letter-spacing:1.4px">PAYMENT RECEIPT</div></td></tr><tr><td style="padding:34px"><p style="font-size:18px;font-weight:700">Hello ${escapeHtml(recipientName)},</p><p style="font-size:15px;line-height:1.7;color:#675a70">We have received your payment. The official PDF receipt is attached for your records.</p><div style="margin:24px 0;padding:22px;background:#f4ecf8;border-radius:14px"><div style="font-size:12px;color:#75637f">AMOUNT PAID</div><div style="margin-top:6px;font-size:30px;font-weight:800;color:#622599">${escapeHtml(amount)}</div><div style="margin-top:14px;font-size:14px;color:#675a70">${escapeHtml(receipt.title)} · ${escapeHtml(paymentDate)}</div></div><p style="font-size:14px;color:#675a70">Receipt number: <strong>${escapeHtml(receipt.receiptNumber)}</strong></p></td></tr><tr><td style="padding:18px;text-align:center;background:#2b113f;color:#e9daf3;font-size:12px">Service &amp; Sacrifice · Be Prepared</td></tr></table></td></tr></table></body></html>`;
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html, attachments: [{ filename: `${receipt.receiptNumber}.pdf`, content: pdfBuffer, contentType: "application/pdf" }] });
 }
 
 export async function verifyEmailTransport() {
