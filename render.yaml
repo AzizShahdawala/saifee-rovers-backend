@@ -39,3 +39,5 @@ services:
         value: Saifee Rovers
       - key: EMAIL_FROM_ADDRESS
         value: webdevelopment5253@gmail.com
+      - key: CELEBRATION_JOB_SECRET
+        sync: false

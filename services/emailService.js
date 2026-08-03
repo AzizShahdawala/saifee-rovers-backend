@@ -58,6 +58,39 @@ function emailHtml({ name, otp, action }) {
 </body></html>`;
 }
 
+async function sendTransactionalEmail({ email, name, subject, text, html, reference = crypto.randomBytes(3).toString("hex").toUpperCase() }) {
+  if (hasBrevoApiCredentials()) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { accept: "application/json", "api-key": brevoApiKey, "content-type": "application/json" },
+      body: JSON.stringify({ sender: { email: senderEmail, name: senderName }, to: [{ email, name }], subject, textContent: text, htmlContent: html, headers: { "X-Entity-Ref-ID": reference } }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Brevo email delivery failed (${response.status}): ${result.message || "Unknown error"}`);
+    console.info("Transactional email accepted by Brevo API", { to: email, subject, messageId: result.messageId });
+    return { messageId: result.messageId, accepted: [email], rejected: [] };
+  }
+  const transporter = createTransport();
+  const info = await transporter.sendMail({ from: process.env.EMAIL_FROM || `${senderName} <${senderEmail}>`, to: email, subject, headers: { "X-Entity-Ref-ID": reference }, text, html });
+  if (!hasSmtpCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
+  return { messageId: info.messageId, accepted: info.accepted || [], rejected: info.rejected || [] };
+}
+
+function birthdayHtml({ celebrantName, recipientName, relationship, patrol }) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f7edf5;font-family:Arial,Helvetica,sans-serif;color:#ffffff">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f7edf5"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;overflow:hidden;border-radius:24px;background:linear-gradient(140deg,#4C1D95,#BE185D 58%,#F97316);box-shadow:0 18px 45px rgba(76,29,149,.28)">
+<tr><td style="padding:42px 34px;text-align:center"><div style="font-size:14px;font-weight:800;letter-spacing:2px">SAIFEE ROVERS</div>
+<div style="margin:30px auto 20px;width:112px;height:112px;line-height:112px;border-radius:56px;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.75);font-size:38px;font-weight:900">&#127874;</div>
+<div style="font-size:42px;font-weight:900;line-height:1.1">HAPPY BIRTHDAY!</div><div style="margin-top:12px;font-size:30px;font-weight:900">${escapeHtml(celebrantName)}</div>
+<p style="margin:24px auto 0;max-width:500px;font-size:17px;line-height:1.7;color:#fff7ed">Wishing you a wonderful year filled with happiness, success and memorable adventures!</p>
+<div style="margin-top:24px;font-size:13px;font-weight:800;letter-spacing:.8px;color:#fde7f3">${escapeHtml(relationship)} &bull; ${escapeHtml(patrol || "Rover Family")}</div>
+</td></tr><tr><td style="padding:18px 28px;text-align:center;background:rgba(0,0,0,.12);font-size:13px;color:#fff7ed">Sent with warm wishes to ${escapeHtml(recipientName)} and family by Saifee Rovers.</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
 export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
   const action = purpose === "activation" ? "activate your member account" : "reset your password";
   const reference = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -65,38 +98,13 @@ export async function sendPasswordOtp({ email, name, otp, purpose = "reset" }) {
   const text = `Hello ${name}, use verification code ${otp} to ${action}. It expires in 10 minutes. If you did not request this, ignore this email.`;
   const html = emailHtml({ name, otp, action });
 
-  if (hasBrevoApiCredentials()) {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { accept: "application/json", "api-key": brevoApiKey, "content-type": "application/json" },
-      body: JSON.stringify({
-        sender: { email: senderEmail, name: senderName },
-        to: [{ email, name }],
-        subject: `${subject} [${reference}]`,
-        textContent: text,
-        htmlContent: html,
-        headers: { "X-Entity-Ref-ID": reference },
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`Brevo email delivery failed (${response.status}): ${result.message || "Unknown error"}`);
-    console.info("Verification email accepted by Brevo API", { to: email, messageId: result.messageId });
-    return { messageId: result.messageId, accepted: [email], rejected: [] };
-  }
+  return sendTransactionalEmail({ email, name, subject: `${subject} [${reference}]`, text, html, reference });
+}
 
-  const transporter = createTransport();
-  const info = await transporter.sendMail({
-    from: process.env.EMAIL_FROM || `${senderName} <${senderEmail}>`,
-    to: email,
-    subject: `${subject} [${reference}]`,
-    headers: { "X-Entity-Ref-ID": reference },
-    text,
-    html,
-  });
-  if (!hasSmtpCredentials() && info.message) console.log(`[development email]\n${info.message.toString()}`);
-  if (hasSmtpCredentials()) console.info("Verification email accepted", { to: email, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
-  return { messageId: info.messageId, accepted: info.accepted || [], rejected: info.rejected || [] };
+export async function sendBirthdayWish({ email, recipientName, celebrantName, relationship, patrol }) {
+  const subject = `Happy Birthday, ${celebrantName}!`;
+  const text = `Happy Birthday, ${celebrantName}! Wishing you a wonderful year filled with happiness, success and memorable adventures. Warm wishes from Saifee Rovers.`;
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html: birthdayHtml({ celebrantName, recipientName, relationship, patrol }) });
 }
 
 export async function verifyEmailTransport() {

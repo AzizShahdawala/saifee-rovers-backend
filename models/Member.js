@@ -43,6 +43,7 @@ const memberSchema = new mongoose.Schema({
   maritalStatus: { type: String, required: true, enum: ["MARRIED", "UNMARRIED"] },
   spouseName: { type: String, trim: true, default: "" },
   spouseDateOfBirth: Date,
+  marriageDate: Date,
   children: { type: [childSchema], default: [] },
   patrol: {
     type: String,
