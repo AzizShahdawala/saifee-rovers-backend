@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": ".",
+      "framework": "express",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "ai",
+          "format": "url",
+          "env": "AI_URL"
+        }
+      ]
+    },
+    "ai": {
+      "root": "ai/",
+      "framework": "fastapi",
+      "entrypoint": "app:app",
+      "functions": {
+        "app.py": {
+          "memory": 2048,
+          "maxDuration": 300,
+          "excludeFiles": "{**/cv2/data/**,**/cv2/**/LICENSE*,**/cv2/**/__pycache__/**}"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "api" } }
+  ],
+  "crons": [
+    { "path": "/api/celebrations/birthday-wishes", "schedule": "0 19 * * *" }
+  ]
+}

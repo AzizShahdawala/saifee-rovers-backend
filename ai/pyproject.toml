@@ -1,0 +1,9 @@
+[project]
+name = "saifee-rovers-face-service"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.139.2",
+  "numpy==1.26.4",
+  "opencv-python-headless==4.7.0.72",
+]

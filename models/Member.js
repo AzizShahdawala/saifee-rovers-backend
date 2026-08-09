@@ -9,6 +9,8 @@ export const generateMemberId = () => String(crypto.randomInt(10_000_000, 100_00
 const imageSchema = new mongoose.Schema({
   fileName: String,
   path: String,
+  gridFsId: mongoose.Schema.Types.ObjectId,
+  mimeType: String,
 }, { _id: false });
 
 const childSchema = new mongoose.Schema({
@@ -83,9 +85,10 @@ memberSchema.pre("validate", function assignUniqueRoleKeys() {
 });
 
 memberSchema.virtual("profileImage").get(function profileImage() {
-  const image = this.profilePhoto?.path ? this.profilePhoto : this.images?.[0];
+  const image = this.profilePhoto?.gridFsId || this.profilePhoto?.path ? this.profilePhoto : this.images?.[0];
   const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-  return image ? `${baseUrl}/${String(image.path).replaceAll("\\\\", "/")}` : undefined;
+  if (image?.gridFsId) return `${baseUrl}/api/profile-images/${image.gridFsId}`;
+  return image?.path ? `${baseUrl}/${String(image.path).replaceAll("\\\\", "/")}` : undefined;
 });
 
 memberSchema.set("toJSON", { virtuals: true });

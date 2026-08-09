@@ -2,8 +2,8 @@ import Member from "../models/Member.js";
 import Event from "../models/Event.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
-import fs from "fs/promises";
 import { syncEventStatuses } from "../services/eventStatusService.js";
+import { deleteProfileImage, storeProfileImageBuffer } from "../services/profileImageStorageService.js";
 
 const attendanceQuery = (memberId) => Attendance.find({ member: memberId })
   .sort({ timestamp: -1 })
@@ -74,14 +74,12 @@ export async function changeMemberPassword(req, res) {
 export async function updateMemberProfilePhoto(req, res) {
   if (!req.file) throw httpError(400, "Choose a JPG or PNG image up to 5 MB");
   const member = await Member.findById(req.user.sub);
-  if (!member || member.status !== "active") {
-    await fs.unlink(req.file.path).catch(() => {});
-    throw httpError(404, "Member profile not found");
-  }
-  const previousPath = member.profilePhoto?.path;
-  member.profilePhoto = { fileName: req.file.filename, path: req.file.path };
+  if (!member || member.status !== "active") throw httpError(404, "Member profile not found");
+  const previousPhoto = member.profilePhoto?.toObject?.() || member.profilePhoto;
+  const gridFsId = await storeProfileImageBuffer(req.file, { ownerType: "member", ownerId: member._id });
+  member.profilePhoto = { fileName: req.file.originalname, gridFsId, mimeType: req.file.mimetype };
   await member.save();
-  if (previousPath && previousPath !== req.file.path) await fs.unlink(previousPath).catch(() => {});
+  await deleteProfileImage(previousPhoto);
   res.json({ success: true, message: "Profile picture updated", member });
 }
 

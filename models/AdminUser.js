@@ -17,12 +17,15 @@ const adminUserSchema = new mongoose.Schema({
   profilePhoto: {
     fileName: String,
     path: String,
+    gridFsId: mongoose.Schema.Types.ObjectId,
+    mimeType: String,
   },
   lastLoginAt: Date,
 }, { timestamps: true });
 
 adminUserSchema.virtual("profileImage").get(function profileImage() {
   const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+  if (this.profilePhoto?.gridFsId) return `${baseUrl}/api/profile-images/${this.profilePhoto.gridFsId}`;
   return this.profilePhoto?.path ? `${baseUrl}/${String(this.profilePhoto.path).replaceAll("\\", "/")}` : undefined;
 });
 

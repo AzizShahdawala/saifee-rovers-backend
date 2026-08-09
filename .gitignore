@@ -10,3 +10,6 @@ ai/python/
 ai/__pycache__/
 .render/
 DEPLOYMENT.local.md
+
+.vercel
+.env.local

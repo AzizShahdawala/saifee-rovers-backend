@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import httpError from "../utils/httpError.js";
 
-const serviceUrl = () => process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";
+const serviceUrl = () => (process.env.AI_URL || process.env.AI_SERVICE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 async function requestEmbedding(image) {
   let response;
@@ -10,7 +10,7 @@ async function requestEmbedding(image) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
   } catch (error) {
     throw httpError(503, "Face recognition service is unavailable. Restart the backend with: npm run dev");
@@ -43,7 +43,7 @@ export async function enrollmentDescriptor(filePaths) {
 
 export async function recognitionServiceHealth() {
   try {
-    const response = await fetch(`${serviceUrl()}/health`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetch(`${serviceUrl()}/health`, { signal: AbortSignal.timeout(60000) });
     if (!response.ok) throw new Error("Health check failed");
     return await response.json();
   } catch {

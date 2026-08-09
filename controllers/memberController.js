@@ -5,6 +5,7 @@ import Member, { INSTRUMENTS, PATROLS, PROFESSIONS } from "../models/Member.js";
 import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
+import { deleteProfileImage, storeProfileImageFile } from "../services/profileImageStorageService.js";
 
 const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "profession", "professionDetails", "maritalStatus", "spouseName", "spouseDateOfBirth", "marriageDate", "children", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => {
@@ -14,6 +15,9 @@ const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key]
   return [key, typeof body[key] === "string" ? body[key].trim() : body[key]];
 }));
 const isTrue = (value) => value === true || value === "true";
+const cleanupEnrollment = (req) => req.memberUploadFolder
+  ? fs.rm(req.memberUploadFolder, { recursive: true, force: true })
+  : Promise.resolve();
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const memberFilter = (query = {}) => {
   const filter = {};
@@ -78,7 +82,7 @@ function validateFamilyDetails({ maritalStatus, spouseName, spouseDateOfBirth, m
 export async function registerMember(req, res) {
   const enrollmentFiles = req.files || [];
   if (![0, 5].includes(enrollmentFiles.length)) {
-    if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    await cleanupEnrollment(req);
     throw httpError(400, "Face enrollment requires all 5 images, or it can be skipped");
   }
   const data = memberBody(req.body);
@@ -91,40 +95,49 @@ export async function registerMember(req, res) {
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
     const member = await Member.create({
       ...data,
-      folder: enrollmentFiles.length ? req.memberFolder : undefined,
-      images: enrollmentFiles.map((file) => ({ fileName: file.filename, path: file.path })),
       faceEnrolled: enrollmentFiles.length === 5,
       descriptor,
     });
+    if (enrollmentFiles.length) {
+      const firstImage = enrollmentFiles[0];
+      const gridFsId = await storeProfileImageFile(firstImage, { ownerType: "member", ownerId: member._id });
+      member.profilePhoto = { fileName: firstImage.originalname, gridFsId, mimeType: firstImage.mimetype };
+      await member.save();
+    }
+    await cleanupEnrollment(req);
     res.status(201).json({ success: true, member });
   } catch (error) {
-    if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    await cleanupEnrollment(req);
     throw uniqueRoleError(error);
   }
 }
 
 export async function enrollMemberFace(req, res) {
   if (!req.files || req.files.length !== 5) {
-    if (req.memberFolder) await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    await cleanupEnrollment(req);
     throw httpError(400, "Exactly 5 face images are required for enrollment");
   }
   const member = await Member.findById(req.params.id);
   if (!member) {
-    await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    await cleanupEnrollment(req);
     throw httpError(404, "Member not found");
   }
-  const previousFolder = member.folder;
+  const previousPhoto = member.profilePhoto?.toObject?.() || member.profilePhoto;
   try {
     const { descriptor } = await enrollmentDescriptor(req.files.map((file) => file.path));
-    member.folder = req.memberFolder;
-    member.images = req.files.map((file) => ({ fileName: file.filename, path: file.path }));
+    const firstImage = req.files[0];
+    const gridFsId = await storeProfileImageFile(firstImage, { ownerType: "member", ownerId: member._id });
+    member.folder = undefined;
+    member.images = [];
+    member.profilePhoto = { fileName: firstImage.originalname, gridFsId, mimeType: firstImage.mimetype };
     member.faceEnrolled = true;
     member.descriptor = descriptor;
     await member.save();
-    if (previousFolder && previousFolder !== req.memberFolder) await fs.rm(path.join("uploads", "members", previousFolder), { recursive: true, force: true });
+    await deleteProfileImage(previousPhoto);
+    await cleanupEnrollment(req);
     res.json({ success: true, message: "Face enrollment updated successfully", member });
   } catch (error) {
-    await fs.rm(path.join("uploads", "members", req.memberFolder), { recursive: true, force: true });
+    await cleanupEnrollment(req);
     throw error;
   }
 }
@@ -242,6 +255,7 @@ export async function deleteMember(req, res) {
   const member = await Member.findByIdAndDelete(req.params.id);
   if (!member) throw httpError(404, "Member not found");
   await Attendance.deleteMany({ member: member._id });
+  await deleteProfileImage(member.profilePhoto);
   if (member.folder) await fs.rm(path.join("uploads", "members", member.folder), { recursive: true, force: true });
   await fs.rm(path.join("uploads", "members", String(member._id)), { recursive: true, force: true });
   res.json({ success: true, message: "Member deleted" });

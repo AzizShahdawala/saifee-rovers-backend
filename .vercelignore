@@ -1,0 +1,6 @@
+ai/models/face_recognition_sface_2021dec.onnx
+ai/python/
+node_modules/
+uploads/
+.git/
+.env*

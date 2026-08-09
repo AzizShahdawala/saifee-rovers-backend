@@ -15,6 +15,8 @@ import anniversaryRoutes from "./routes/anniversaryRoutes.js";
 import celebrationRoutes from "./routes/celebrationRoutes.js";
 import receiptRoutes from "./routes/receiptRoutes.js";
 import contactInquiryRoutes from "./routes/contactInquiryRoutes.js";
+import profileImageRoutes from "./routes/profileImageRoutes.js";
+import connectDB from "./config/db.js";
 import asyncHandler from "./utils/asyncHandler.js";
 import { getDashboard } from "./controllers/dashboardController.js";
 import { recognitionServiceHealth } from "./services/faceRecognitionService.js";
@@ -35,7 +37,12 @@ app.get("/", (req, res) => res.json({
   health: "/api/health",
 }));
 app.get("/api/health", (req, res) => res.json({ success: true, status: "ok" }));
+app.use("/api", asyncHandler(async (req, res, next) => {
+  await connectDB();
+  next();
+}));
 app.get("/api/recognition/health", asyncHandler(async (req, res) => res.json({ success: true, service: await recognitionServiceHealth() })));
+app.use("/api/profile-images", profileImageRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin-profile", adminProfileRoutes);
 app.use("/api/event-media", eventMediaRoutes);

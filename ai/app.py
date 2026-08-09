@@ -1,6 +1,9 @@
 import base64
 import binascii
+import hashlib
+import os
 import threading
+import urllib.request
 from pathlib import Path
 
 import cv2
@@ -11,12 +14,30 @@ from pydantic import BaseModel
 ROOT = Path(__file__).resolve().parent
 MODEL_DIR = ROOT / "models"
 DETECTOR_PATH = MODEL_DIR / "face_detection_yunet_2023mar.onnx"
-RECOGNIZER_PATH = MODEL_DIR / "face_recognition_sface_2021dec.onnx"
+PACKAGED_RECOGNIZER_PATH = MODEL_DIR / "face_recognition_sface_2021dec.onnx"
+RECOGNIZER_URL = "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
+RECOGNIZER_SHA256 = "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
+
+
+def recognizer_model_path() -> Path:
+    if PACKAGED_RECOGNIZER_PATH.exists() and PACKAGED_RECOGNIZER_PATH.stat().st_size > 0:
+        return PACKAGED_RECOGNIZER_PATH
+    cache_dir = Path(os.getenv("TMPDIR", "/tmp")) / "saifee-rovers-models"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cached = cache_dir / PACKAGED_RECOGNIZER_PATH.name
+    if cached.exists() and hashlib.sha256(cached.read_bytes()).hexdigest() == RECOGNIZER_SHA256:
+        return cached
+    partial = cached.with_suffix(".download")
+    urllib.request.urlretrieve(RECOGNIZER_URL, partial)
+    if hashlib.sha256(partial.read_bytes()).hexdigest() != RECOGNIZER_SHA256:
+        partial.unlink(missing_ok=True)
+        raise RuntimeError("Downloaded face recognition model failed integrity verification")
+    partial.replace(cached)
+    return cached
 
 if not DETECTOR_PATH.exists() or DETECTOR_PATH.stat().st_size == 0:
     raise RuntimeError(f"Missing face detector model: {DETECTOR_PATH}")
-if not RECOGNIZER_PATH.exists() or RECOGNIZER_PATH.stat().st_size == 0:
-    raise RuntimeError(f"Missing face recognition model: {RECOGNIZER_PATH}")
+RECOGNIZER_PATH = recognizer_model_path()
 
 detector = cv2.FaceDetectorYN.create(str(DETECTOR_PATH), "", (320, 320), 0.85, 0.3, 5000)
 recognizer = cv2.FaceRecognizerSF.create(str(RECOGNIZER_PATH), "")

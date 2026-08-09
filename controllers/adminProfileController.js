@@ -1,6 +1,6 @@
-import fs from "fs/promises";
 import AdminUser from "../models/AdminUser.js";
 import httpError from "../utils/httpError.js";
+import { deleteProfileImage, storeProfileImageBuffer } from "../services/profileImageStorageService.js";
 
 export async function getAdminProfile(req, res) {
   const admin = await AdminUser.findById(req.user.sub);
@@ -24,13 +24,11 @@ export async function changeAdminPassword(req, res) {
 export async function updateAdminProfilePhoto(req, res) {
   if (!req.file) throw httpError(400, "Choose a JPG or PNG image up to 5 MB");
   const admin = await AdminUser.findById(req.user.sub);
-  if (!admin || !admin.active) {
-    await fs.unlink(req.file.path).catch(() => {});
-    throw httpError(404, "Administrator profile not found");
-  }
-  const previousPath = admin.profilePhoto?.path;
-  admin.profilePhoto = { fileName: req.file.filename, path: req.file.path };
+  if (!admin || !admin.active) throw httpError(404, "Administrator profile not found");
+  const previousPhoto = admin.profilePhoto?.toObject?.() || admin.profilePhoto;
+  const gridFsId = await storeProfileImageBuffer(req.file, { ownerType: "admin", ownerId: admin._id });
+  admin.profilePhoto = { fileName: req.file.originalname, gridFsId, mimeType: req.file.mimetype };
   await admin.save();
-  if (previousPath && previousPath !== req.file.path) await fs.unlink(previousPath).catch(() => {});
+  await deleteProfileImage(previousPhoto);
   res.json({ success: true, message: "Profile picture updated", admin });
 }

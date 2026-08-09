@@ -1,5 +1,6 @@
 import multer from "multer";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { v4 as uuid } from "uuid";
 
@@ -9,7 +10,9 @@ const storage = multer.diskStorage({
       req.memberFolder = uuid();
     }
 
-    const folder = path.join("uploads", "members", req.memberFolder);
+    const root = process.env.VERCEL ? path.join(os.tmpdir(), "saifee-rovers", "members") : path.join("uploads", "members");
+    const folder = path.join(root, req.memberFolder);
+    req.memberUploadFolder = folder;
 
     fs.mkdirSync(folder, {
       recursive: true,
@@ -47,36 +50,14 @@ const upload = multer({
 
 export default upload;
 
-const profileStorage = multer.diskStorage({
-  destination(req, file, cb) {
-    const folder = path.join("uploads", "members", String(req.user.sub), "profile");
-    fs.mkdirSync(folder, { recursive: true });
-    cb(null, folder);
-  },
-  filename(req, file, cb) {
-    cb(null, `profile-${Date.now()}${path.extname(file.originalname).toLowerCase()}`);
-  },
-});
-
 export const profilePhotoUpload = multer({
-  storage: profileStorage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-const adminProfileStorage = multer.diskStorage({
-  destination(req, file, cb) {
-    const folder = path.join("uploads", "admins", String(req.user.sub), "profile");
-    fs.mkdirSync(folder, { recursive: true });
-    cb(null, folder);
-  },
-  filename(req, file, cb) {
-    cb(null, `profile-${Date.now()}${path.extname(file.originalname).toLowerCase()}`);
-  },
-});
-
 export const adminProfilePhotoUpload = multer({
-  storage: adminProfileStorage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 },
 });
