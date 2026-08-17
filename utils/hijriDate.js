@@ -20,4 +20,22 @@ export function gregorianToHijri(value) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+export function hijriParts(value) {
+  const canonical = gregorianToHijri(value);
+  if (!canonical) return null;
+  const [year, month, day] = canonical.split("-").map(Number);
+  return { year, month, day, canonical };
+}
+
+export function hijriToGregorian(year, month, day) {
+  const approximateGregorianYear = Math.floor((Number(year) * 354.367) / 365.2425) + 622;
+  const cursor = new Date(Date.UTC(approximateGregorianYear - 1, 0, 1));
+  for (let index = 0; index < 1100; index += 1) {
+    const parts = hijriParts(cursor);
+    if (parts?.year === Number(year) && parts.month === Number(month) && parts.day === Number(day)) return new Date(cursor);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return null;
+}
+
 export const HIJRI_DATE_VALIDATION_MESSAGE = "Hijri date of birth must use YYYY-MM-DD (Umm al-Qura calendar)";
