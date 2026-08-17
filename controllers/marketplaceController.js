@@ -112,6 +112,34 @@ export async function updateMarketplaceStatus(req, res) {
   res.json({ success: true, listing: present(await findListing(listing._id)) });
 }
 
+export async function updateMarketplaceListing(req, res) {
+  const listing = await findListing(req.params.id);
+  if (req.user.role !== "member" || String(listing.seller._id) !== memberId(req)) throw httpError(403, "Only the seller can edit this listing");
+  const title = String(req.body.title || "").trim();
+  const description = String(req.body.description || "").trim();
+  const listingType = req.body.listingType;
+  const price = listingType === "donation" ? 0 : Number(req.body.price);
+  if (!title || !description || !["sale", "donation"].includes(listingType)) throw httpError(400, "Title, description and listing type are required");
+  if (listingType === "sale" && (!Number.isFinite(price) || price < 0)) throw httpError(400, "Enter a valid asking price");
+  if (["sold", "donated"].includes(listing.status) && (listingType !== listing.listingType || price !== listing.price)) throw httpError(409, "The offer type and price of a completed transaction cannot be changed");
+  listing.title = title;
+  listing.description = description;
+  listing.listingType = listingType;
+  listing.price = price;
+  await listing.save();
+  res.json({ success: true, listing: present(await findListing(listing._id)) });
+}
+
+export async function deleteMarketplaceListing(req, res) {
+  const listing = await findListing(req.params.id);
+  if (req.user.role !== "member" || String(listing.seller._id) !== memberId(req)) throw httpError(403, "Only the seller can delete this listing");
+  if (["sold", "donated"].includes(listing.status)) throw httpError(409, "Sold or donated listings must remain in transaction history");
+  const mediaIds = listing.media.map((media) => media.gridFsId);
+  await MarketplaceListing.deleteOne({ _id: listing._id });
+  await deleteMarketplaceMedia(mediaIds);
+  res.json({ success: true, message: "Marketplace listing deleted" });
+}
+
 export async function streamMarketplaceListingMedia(req, res) {
   if (!verifyMarketplaceMediaLink(req.params.mediaId, req.query.expires, req.query.signature)) throw httpError(403, "Media link is invalid or expired");
   const listing = await MarketplaceListing.findById(req.params.id);
