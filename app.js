@@ -37,7 +37,7 @@ app.get("/", (req, res) => res.json({
   api: "/api",
   health: "/api/health",
 }));
-app.get("/api/health", (req, res) => res.json({ success: true, status: "ok" }));
+app.get("/api/health", (req, res) => res.json({ success: true, status: "ok", memberSchema: "joined-year-v1" }));
 app.use("/api", asyncHandler(async (req, res, next) => {
   await connectDB();
   next();
