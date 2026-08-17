@@ -8,7 +8,7 @@ const smtpUser = String(process.env.SMTP_USER || "").trim();
 const smtpPassword = String(process.env.SMTP_PASSWORD || "").trim();
 const hasSmtpCredentials = () => Boolean(smtpHost && smtpPort && smtpUser && smtpPassword);
 const brevoApiKey = String(process.env.BREVO_API_KEY || "").trim();
-const senderEmail = process.env.EMAIL_FROM_ADDRESS || "contact@azizshahda.com";
+const senderEmail = process.env.EMAIL_FROM_ADDRESS || "webdevelopment5253@gmail.com";
 const senderName = process.env.EMAIL_FROM_NAME || "Saifee Rovers";
 const hasBrevoApiCredentials = () => Boolean(brevoApiKey && senderEmail);
 const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
