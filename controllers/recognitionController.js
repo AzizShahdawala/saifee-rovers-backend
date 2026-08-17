@@ -6,7 +6,7 @@ const syntheticImage = () => {
   const height = 100;
   const rowSize = Math.ceil((width * 3) / 4) * 4;
   const imageSize = rowSize * height;
-  const bitmap = Buffer.alloc(54 + imageSize, 255);
+  const bitmap = Buffer.alloc(54 + imageSize);
   bitmap.write("BM", 0);
   bitmap.writeUInt32LE(bitmap.length, 2);
   bitmap.writeUInt32LE(54, 10);
@@ -16,6 +16,7 @@ const syntheticImage = () => {
   bitmap.writeUInt16LE(1, 26);
   bitmap.writeUInt16LE(24, 28);
   bitmap.writeUInt32LE(imageSize, 34);
+  bitmap.fill(255, 54);
   return bitmap.toString("base64");
 };
 
