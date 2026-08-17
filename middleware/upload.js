@@ -72,3 +72,9 @@ export const eventMediaUpload = multer({
   fileFilter: eventMediaFilter,
   limits: { fileSize: 100 * 1024 * 1024, files: 20 },
 });
+
+export const marketplaceMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: eventMediaFilter,
+  limits: { fileSize: 4 * 1024 * 1024, files: 8 },
+});

@@ -19,6 +19,7 @@ import receiptRoutes from "./routes/receiptRoutes.js";
 import contactInquiryRoutes from "./routes/contactInquiryRoutes.js";
 import profileImageRoutes from "./routes/profileImageRoutes.js";
 import recognitionRoutes from "./routes/recognitionRoutes.js";
+import marketplaceRoutes from "./routes/marketplaceRoutes.js";
 import connectDB from "./config/db.js";
 import asyncHandler from "./utils/asyncHandler.js";
 import { getDashboard } from "./controllers/dashboardController.js";
@@ -47,6 +48,7 @@ app.use("/api", asyncHandler(async (req, res, next) => {
 }));
 app.get("/api/recognition/health", asyncHandler(async (req, res) => res.json({ success: true, service: await recognitionServiceHealth() })));
 app.use("/api/recognition", recognitionRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/profile-images", profileImageRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin-profile", adminProfileRoutes);
