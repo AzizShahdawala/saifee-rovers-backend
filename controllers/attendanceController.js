@@ -49,7 +49,7 @@ export async function recognizeAttendance(req, res) {
   const event = req.body.eventId
     ? await Event.findById(req.body.eventId)
     : await Event.findOne({ status: { $in: ["active", "ongoing"] } }).sort({ date: -1, startTime: -1 });
-  if (!event) throw httpError(400, "No active event is available for attendance scanning");
+  if (!event) throw httpError(409, "Attendance scanning is unavailable because no event is currently active");
   await refreshEventStatus(event);
   if (!["active", "ongoing"].includes(event.status)) throw httpError(400, event.status === "completed" ? "This event has ended and no longer accepts scanner attendance" : "This event is not currently active");
 

@@ -100,3 +100,33 @@ export async function streamEventMedia(req, res) {
   if (!media) throw httpError(404, "Media not found");
   return streamStoredEventMedia(req, res, media, req.path.endsWith("/download"));
 }
+
+export async function deleteAllEventMedia(req, res) {
+  if (req.body.confirm !== "DELETE_ALL_EVENT_MEDIA") {
+    throw httpError(400, "Set confirm to DELETE_ALL_EVENT_MEDIA to remove all uploaded event media");
+  }
+
+  const database = EventMedia.db.db;
+  const [records, gridFsFiles, gridFsChunks] = await Promise.all([
+    EventMedia.countDocuments({}),
+    database.collection("eventMedia.files").countDocuments({}),
+    database.collection("eventMedia.chunks").countDocuments({}),
+  ]);
+
+  const [recordResult, fileResult, chunkResult] = await Promise.all([
+    EventMedia.deleteMany({}),
+    database.collection("eventMedia.files").deleteMany({}),
+    database.collection("eventMedia.chunks").deleteMany({}),
+  ]);
+
+  res.json({
+    success: true,
+    message: "All uploaded event media was deleted",
+    found: { records, gridFsFiles, gridFsChunks },
+    deleted: {
+      records: recordResult.deletedCount,
+      gridFsFiles: fileResult.deletedCount,
+      gridFsChunks: chunkResult.deletedCount,
+    },
+  });
+}

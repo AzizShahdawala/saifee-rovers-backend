@@ -13,7 +13,12 @@ async function requestEmbedding(image) {
       signal: AbortSignal.timeout(60000),
     });
   } catch (error) {
-    throw httpError(503, "Face recognition service is unavailable. Restart the backend with: npm run dev");
+    console.error("[face-recognition] embedding request failed", {
+      serviceUrl: serviceUrl(),
+      error: error?.message || String(error),
+      cause: error?.cause?.message,
+    });
+    throw httpError(503, "Face recognition service is unavailable. Please retry shortly or contact an administrator");
   }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw httpError(response.status, result.detail || "Face processing failed");
@@ -46,8 +51,13 @@ export async function recognitionServiceHealth() {
     const response = await fetch(`${serviceUrl()}/health`, { signal: AbortSignal.timeout(60000) });
     if (!response.ok) throw new Error("Health check failed");
     return await response.json();
-  } catch {
-    throw httpError(503, "Face recognition service is unavailable. Restart the backend with: npm run dev");
+  } catch (error) {
+    console.error("[face-recognition] health check failed", {
+      serviceUrl: serviceUrl(),
+      error: error?.message || String(error),
+      cause: error?.cause?.message,
+    });
+    throw httpError(503, "Face recognition service is unavailable. Please retry shortly or contact an administrator");
   }
 }
 
