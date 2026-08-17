@@ -7,7 +7,7 @@ import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 import { deleteProfileImage, storeProfileImageFile } from "../services/profileImageStorageService.js";
 import { applyPatrolTransition, backfillMemberMetadata, formatPatrolHistory, joinedYearStart, updateInitialPatrolStart } from "../services/memberHistoryService.js";
-import { gregorianToHijri, HIJRI_DATE_VALIDATION_MESSAGE, isValidHijriDate } from "../utils/hijriDate.js";
+import { BOHRA_CALENDAR_VERSION, gregorianToHijri, HIJRI_DATE_VALIDATION_MESSAGE, isValidHijriDate } from "../utils/hijriDate.js";
 
 const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "hijriDateOfBirth", "joinedYear", "profession", "professionDetails", "maritalStatus", "spouseName", "spouseDateOfBirth", "marriageDate", "children", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => {
@@ -106,6 +106,7 @@ export async function registerMember(req, res) {
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
     const member = await Member.create({
       ...data,
+      hijriCalendarVersion: BOHRA_CALENDAR_VERSION,
       patrolHistory: [{ patrol: data.patrol, fromDate: joinedYearStart(data.joinedYear), toDate: null }],
       faceEnrolled: enrollmentFiles.length === 5,
       descriptor,
@@ -264,6 +265,7 @@ export async function updateMember(req, res) {
   if (next.joinedYear !== member.joinedYear) updateInitialPatrolStart(member, next.joinedYear);
   applyPatrolTransition(member, next.patrol);
   member.set(data);
+  member.hijriCalendarVersion = BOHRA_CALENDAR_VERSION;
   try {
     await member.save();
   } catch (error) {

@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import httpError from "../utils/httpError.js";
 import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
+import { notifyEventScheduled } from "../services/notificationService.js";
 
 const writable = ["title", "date", "startTime", "endTime", "venue", "agenda", "status"];
 const body = (value) => Object.fromEntries(writable.filter((key) => value[key] !== undefined).map((key) => [key, value[key]]));
@@ -15,6 +16,7 @@ export async function createEvent(req, res) {
   if (!req.body.title?.trim() || !req.body.date) throw httpError(400, "Title and date are required");
   const event = await Event.create(body(req.body));
   await refreshEventStatus(event);
+  try { await notifyEventScheduled(event); } catch (error) { console.error("Event notification delivery failed", { eventId: event._id, error: error.message }); }
   res.status(201).json({ success: true, event });
 }
 

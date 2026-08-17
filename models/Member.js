@@ -55,6 +55,7 @@ const memberSchema = new mongoose.Schema({
     trim: true,
     validate: { validator: isValidHijriDate, message: HIJRI_DATE_VALIDATION_MESSAGE },
   },
+  hijriCalendarVersion: { type: String, default: "bohra-misri-v1" },
   joinedYear: {
     type: Number,
     required: true,

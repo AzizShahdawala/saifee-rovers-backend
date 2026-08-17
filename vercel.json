@@ -30,6 +30,6 @@
     { "source": "/(.*)", "destination": { "service": "api" } }
   ],
   "crons": [
-    { "path": "/api/celebrations/birthday-wishes", "schedule": "0 19 * * *" }
+    { "path": "/api/celebrations/daily", "schedule": "0 19 * * *" }
   ]
 }

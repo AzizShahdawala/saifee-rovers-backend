@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const celebrationEmailLogSchema = new mongoose.Schema({
   dateKey: { type: String, required: true },
-  kind: { type: String, enum: ["birthday"], required: true },
+  kind: { type: String, enum: ["birthday", "waras", "anniversary"], required: true },
   personKey: { type: String, required: true },
   recipient: { type: String, required: true },
   messageId: String,

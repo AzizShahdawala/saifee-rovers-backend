@@ -4,6 +4,7 @@ import Event from "../models/Event.js";
 import httpError from "../utils/httpError.js";
 import { cosineSimilarity, embeddingFromDataUrl } from "../services/faceRecognitionService.js";
 import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
+import { notifyAttendanceRecorded } from "../services/notificationService.js";
 
 const populate = (query) => query.populate("member", "name email phone patrol joinedYear status images").populate("event", "title date venue");
 
@@ -40,6 +41,7 @@ export async function recordManual(req, res) {
     throw error;
   }
   await attendance.populate([{ path: "member", select: "name email phone patrol status images" }, { path: "event", select: "title date venue" }]);
+  try { await notifyAttendanceRecorded(attendance); } catch (error) { console.error("Attendance notification delivery failed", { attendanceId: attendance._id, error: error.message }); }
   res.status(201).json({ success: true, attendance });
 }
 
@@ -74,6 +76,7 @@ export async function recognizeAttendance(req, res) {
     throw error;
   }
   await attendance.populate([{ path: "member", select: "name email phone patrol status images" }, { path: "event", select: "title date venue" }]);
+  try { await notifyAttendanceRecorded(attendance); } catch (error) { console.error("Attendance notification delivery failed", { attendanceId: attendance._id, error: error.message }); }
   res.status(201).json({ success: true, attendance });
 }
 

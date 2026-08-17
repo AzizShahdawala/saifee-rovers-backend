@@ -1,5 +1,5 @@
 import Member, { DEFAULT_JOINED_YEAR } from "../models/Member.js";
-import { gregorianToHijri } from "../utils/hijriDate.js";
+import { BOHRA_CALENDAR_VERSION, gregorianToHijri } from "../utils/hijriDate.js";
 
 export const joinedYearStart = (year = DEFAULT_JOINED_YEAR) => new Date(Date.UTC(Number(year) || DEFAULT_JOINED_YEAR, 0, 1));
 
@@ -28,14 +28,16 @@ export async function backfillMemberMetadata() {
     $or: [
       { hijriDateOfBirth: { $exists: false } },
       { hijriDateOfBirth: "" },
+      { hijriCalendarVersion: { $ne: BOHRA_CALENDAR_VERSION } },
       { patrolHistory: { $exists: false } },
       { patrolHistory: { $size: 0 } },
     ],
-  }).select("dateOfBirth hijriDateOfBirth joinedYear patrol patrolHistory");
+  }).select("dateOfBirth hijriDateOfBirth hijriCalendarVersion joinedYear patrol patrolHistory");
   if (!members.length) return { matched: 0, modified: 0 };
   const operations = members.map((member) => {
     const set = {};
-    if (!member.hijriDateOfBirth) set.hijriDateOfBirth = gregorianToHijri(member.dateOfBirth);
+    if (!member.hijriDateOfBirth || member.hijriCalendarVersion !== BOHRA_CALENDAR_VERSION) set.hijriDateOfBirth = gregorianToHijri(member.dateOfBirth);
+    if (member.hijriCalendarVersion !== BOHRA_CALENDAR_VERSION) set.hijriCalendarVersion = BOHRA_CALENDAR_VERSION;
     if (!member.patrolHistory?.length) set.patrolHistory = [{ patrol: member.patrol, fromDate: joinedYearStart(member.joinedYear), toDate: null }];
     return { updateOne: { filter: { _id: member._id }, update: { $set: set } } };
   });

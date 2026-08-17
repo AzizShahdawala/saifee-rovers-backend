@@ -109,6 +109,39 @@ export async function sendBirthdayWish({ email, recipientName, celebrantName, re
   return sendTransactionalEmail({ email, name: recipientName, subject, text, html: birthdayHtml({ celebrantName, recipientName, relationship, patrol }) });
 }
 
+const noticeHtml = ({ eyebrow, title, greeting, message, detail, color = "#075b63" }) => `<!doctype html><html lang="en"><body style="margin:0;background:#eef4f8;font-family:Arial,Helvetica,sans-serif;color:#102a43"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 12px 36px rgba(15,53,87,.12)"><tr><td style="padding:30px;text-align:center;background:${color};color:#fff"><div style="font-size:13px;font-weight:800;letter-spacing:1.5px">${escapeHtml(eyebrow)}</div><div style="margin-top:8px;font-size:28px;font-weight:900">${escapeHtml(title)}</div></td></tr><tr><td style="padding:34px"><p style="font-size:18px;font-weight:800">${escapeHtml(greeting)}</p><p style="font-size:15px;line-height:1.7;color:#52677a">${escapeHtml(message)}</p><div style="margin-top:22px;padding:18px;border-radius:12px;background:#f1f5f9;font-size:14px;line-height:1.7;color:#334155">${escapeHtml(detail)}</div></td></tr><tr><td style="padding:18px;text-align:center;background:#f8fafc;color:#64748b;font-size:12px">Saifee Rovers · Service &amp; Sacrifice</td></tr></table></td></tr></table></body></html>`;
+
+export async function sendWarasWish({ email, recipientName, celebrantName, relationship, patrol, hijriDate }) {
+  const subject = `Waras Mubarak, ${celebrantName}!`;
+  const text = `Waras Mubarak to ${celebrantName}. May this year bring barakat, good health and happiness. ${relationship}, ${patrol || "Rover Family"}. Hijri date: ${hijriDate}.`;
+  const html = noticeHtml({ eyebrow: "WARAS MUBARAK", title: celebrantName, greeting: `Hello ${recipientName},`, message: "May this new year of life bring barakat, good health, happiness and continued khidmat.", detail: `${relationship} · ${patrol || "Rover Family"} · ${hijriDate}`, color: "#5B21B6" });
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html });
+}
+
+export async function sendAnniversaryWish({ email, recipientName, coupleName, years }) {
+  const subject = `Happy Anniversary, ${coupleName}!`;
+  const text = `Happy ${years} anniversary to ${coupleName}. Wishing you continued happiness and togetherness. Warm wishes from Saifee Rovers.`;
+  const html = noticeHtml({ eyebrow: "HAPPY ANNIVERSARY", title: coupleName, greeting: `Hello ${recipientName},`, message: "Wishing you continued happiness, togetherness and many more memorable years ahead.", detail: `${years} years · Warm wishes from Saifee Rovers`, color: "#BE185D" });
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html });
+}
+
+export async function sendEventScheduledEmail({ email, recipientName, event }) {
+  const date = new Date(event.date).toLocaleDateString("en-IN", { dateStyle: "long", timeZone: "Asia/Kolkata" });
+  const timing = [event.startTime, event.endTime].filter(Boolean).join(" – ") || "Timing will be shared separately";
+  const subject = `New event scheduled: ${event.title}`;
+  const text = `${event.title} is scheduled for ${date} at ${event.venue}. ${timing}. ${event.agenda || ""}`;
+  const html = noticeHtml({ eyebrow: "NEW EVENT", title: event.title, greeting: `Hello ${recipientName},`, message: event.agenda || "A new Saifee Rovers event has been scheduled.", detail: `${date} · ${timing} · ${event.venue}`, color: "#0369A1" });
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html });
+}
+
+export async function sendAttendanceConfirmation({ email, recipientName, event, timestamp, status }) {
+  const time = new Date(timestamp).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Kolkata" });
+  const subject = `Attendance recorded: ${event.title}`;
+  const text = `Hello ${recipientName}, your attendance for ${event.title} was recorded as ${status} at ${time}. Venue: ${event.venue}.`;
+  const html = noticeHtml({ eyebrow: "ATTENDANCE CONFIRMATION", title: event.title, greeting: `Hello ${recipientName},`, message: `Your attendance has been recorded as ${status}.`, detail: `${time} · ${event.venue}`, color: "#0F766E" });
+  return sendTransactionalEmail({ email, name: recipientName, subject, text, html });
+}
+
 export async function sendReceiptEmail({ email, recipientName, receipt, pdfBuffer }) {
   const subject = `Payment receipt ${receipt.receiptNumber} - Saifee Rovers`;
   const amount = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(receipt.amount);
