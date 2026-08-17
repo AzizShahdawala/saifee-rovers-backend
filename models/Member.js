@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
+import { HIJRI_DATE_VALIDATION_MESSAGE, isValidHijriDate } from "../utils/hijriDate.js";
 
 export const PATROLS = ["FOX", "DOVE", "BULL", "PEACOCK", "OFFICERS", "MENTOR", "MPL", "RHINO", "TURTLE", "SLEEPING", "NRI"];
 export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
@@ -18,6 +19,12 @@ const imageSchema = new mongoose.Schema({
 const childSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   dateOfBirth: { type: Date, required: true },
+}, { _id: true });
+
+const patrolHistorySchema = new mongoose.Schema({
+  patrol: { type: String, required: true, enum: PATROLS },
+  fromDate: { type: Date, required: true },
+  toDate: { type: Date, default: null },
 }, { _id: true });
 
 const memberSchema = new mongoose.Schema({
@@ -42,6 +49,12 @@ const memberSchema = new mongoose.Schema({
     lowercase: true,
   },
   dateOfBirth: { type: Date, required: true },
+  hijriDateOfBirth: {
+    type: String,
+    required: true,
+    trim: true,
+    validate: { validator: isValidHijriDate, message: HIJRI_DATE_VALIDATION_MESSAGE },
+  },
   joinedYear: {
     type: Number,
     required: true,
@@ -61,6 +74,7 @@ const memberSchema = new mongoose.Schema({
     required: true,
     enum: PATROLS,
   },
+  patrolHistory: { type: [patrolHistorySchema], default: [] },
   isPatrolLeader: { type: Boolean, default: false },
   patrolLeaderKey: { type: String, select: false, unique: true, sparse: true },
   instrument: { type: String, enum: ["", ...INSTRUMENTS], default: "" },

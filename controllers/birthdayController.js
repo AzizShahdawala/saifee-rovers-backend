@@ -6,7 +6,7 @@ const addDays = (value, days) => new Date(value.getFullYear(), value.getMonth(),
 const sameDay = (first, second) => first.getMonth() === second.getMonth() && first.getDate() === second.getDate();
 const occurrence = (birthDate, year) => new Date(year, birthDate.getUTCMonth(), birthDate.getUTCDate());
 
-const birthdayItem = ({ type, name, birthDate, member, relationship }) => {
+const birthdayItem = ({ type, name, birthDate, hijriDateOfBirth, member, relationship }) => {
   if (!birthDate || !name) return null;
   const parsed = new Date(birthDate);
   if (Number.isNaN(parsed.getTime())) return null;
@@ -22,6 +22,7 @@ const birthdayItem = ({ type, name, birthDate, member, relationship }) => {
     memberName: member.name,
     patrol: member.patrol,
     dateOfBirth: parsed,
+    hijriDateOfBirth: hijriDateOfBirth || undefined,
     nextBirthday,
     turningAge: nextBirthday.getFullYear() - parsed.getUTCFullYear(),
     daysAway: Math.round((nextBirthday - today) / 86400000),
@@ -32,9 +33,9 @@ export async function getBirthdays(req, res) {
   const view = ["today", "week", "month"].includes(req.query.view) ? req.query.view : "today";
   const requestedMonth = req.query.month === undefined ? new Date().getMonth() + 1 : Number(req.query.month);
   if (!Number.isInteger(requestedMonth) || requestedMonth < 1 || requestedMonth > 12) throw httpError(400, "Month must be between 1 and 12");
-  const members = await Member.find().select("name patrol dateOfBirth maritalStatus spouseName spouseDateOfBirth children");
+  const members = await Member.find().select("name patrol dateOfBirth hijriDateOfBirth maritalStatus spouseName spouseDateOfBirth children");
   const all = members.flatMap((member) => {
-    const items = [birthdayItem({ type: "MEMBER", name: member.name, birthDate: member.dateOfBirth, member, relationship: "Member" })];
+    const items = [birthdayItem({ type: "MEMBER", name: member.name, birthDate: member.dateOfBirth, hijriDateOfBirth: member.hijriDateOfBirth, member, relationship: "Member" })];
     if (member.maritalStatus === "MARRIED") items.push(birthdayItem({ type: "SPOUSE", name: member.spouseName, birthDate: member.spouseDateOfBirth, member, relationship: `Spouse of ${member.name}` }));
     for (const child of member.children || []) items.push(birthdayItem({ type: "CHILD", name: child.name, birthDate: child.dateOfBirth, member, relationship: `Child of ${member.name}` }));
     return items.filter(Boolean);

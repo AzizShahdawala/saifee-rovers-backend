@@ -6,8 +6,10 @@ import Attendance from "../models/Attendance.js";
 import httpError from "../utils/httpError.js";
 import { enrollmentDescriptor } from "../services/faceRecognitionService.js";
 import { deleteProfileImage, storeProfileImageFile } from "../services/profileImageStorageService.js";
+import { applyPatrolTransition, backfillMemberMetadata, formatPatrolHistory, joinedYearStart, updateInitialPatrolStart } from "../services/memberHistoryService.js";
+import { gregorianToHijri, HIJRI_DATE_VALIDATION_MESSAGE, isValidHijriDate } from "../utils/hijriDate.js";
 
-const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "joinedYear", "profession", "professionDetails", "maritalStatus", "spouseName", "spouseDateOfBirth", "marriageDate", "children", "patrol", "instrument", "status", "isPatrolLeader"];
+const fields = ["itsId", "name", "phone", "email", "dateOfBirth", "hijriDateOfBirth", "joinedYear", "profession", "professionDetails", "maritalStatus", "spouseName", "spouseDateOfBirth", "marriageDate", "children", "patrol", "instrument", "status", "isPatrolLeader"];
 const memberBody = (body) => Object.fromEntries(fields.filter((key) => body[key] !== undefined).map((key) => {
   if (key === "children" && typeof body[key] === "string") {
     try { return [key, JSON.parse(body[key])]; } catch { throw httpError(400, "Children details are invalid"); }
@@ -28,7 +30,7 @@ const memberFilter = (query = {}) => {
   const search = String(query.search || "").trim();
   if (search) {
     const pattern = new RegExp(escapeRegex(search), "i");
-    filter.$or = ["itsId", "name", "email", "phone", "patrol", "instrument", "profession", "professionDetails"].map((field) => ({ [field]: pattern }));
+    filter.$or = ["itsId", "name", "email", "phone", "hijriDateOfBirth", "patrol", "instrument", "profession", "professionDetails"].map((field) => ({ [field]: pattern }));
   }
   return filter;
 };
@@ -61,9 +63,10 @@ async function ensureUniqueRoles({ patrol, isPatrolLeader, instrument, excludeId
   }
 }
 
-function validatePersonalDetails({ dateOfBirth, joinedYear, profession, professionDetails }) {
+function validatePersonalDetails({ dateOfBirth, hijriDateOfBirth, joinedYear, profession, professionDetails }) {
   const birthDate = new Date(dateOfBirth);
   if (!dateOfBirth || Number.isNaN(birthDate.getTime()) || birthDate > new Date()) throw httpError(400, "A valid date of birth is required and cannot be in the future");
+  if (!isValidHijriDate(hijriDateOfBirth)) throw httpError(400, HIJRI_DATE_VALIDATION_MESSAGE);
   if (!Number.isInteger(joinedYear) || joinedYear < MIN_JOINED_YEAR || joinedYear > new Date().getFullYear()) throw httpError(400, `Joined year must be a whole year between ${MIN_JOINED_YEAR} and ${new Date().getFullYear()}`);
   if (!PROFESSIONS.includes(profession)) throw httpError(400, `Profession must be one of: ${PROFESSIONS.join(", ")}`);
   if (profession !== "RETIRED" && !String(professionDetails || "").trim()) throw httpError(400, "Profession details are required for the selected profession");
@@ -93,6 +96,7 @@ export async function registerMember(req, res) {
   }
   const data = memberBody(req.body);
   data.joinedYear ??= DEFAULT_JOINED_YEAR;
+  data.hijriDateOfBirth ||= gregorianToHijri(data.dateOfBirth);
   if (!data.name || !data.phone || !data.email || !data.patrol || (data.patrol !== "OFFICERS" && !data.instrument)) throw httpError(400, "Name, phone, email and patrol are required; instrument is required unless the patrol is OFFICERS");
   try {
     validatePersonalDetails(data);
@@ -102,6 +106,7 @@ export async function registerMember(req, res) {
     const descriptor = enrollmentFiles.length ? (await enrollmentDescriptor(enrollmentFiles.map((file) => file.path))).descriptor : undefined;
     const member = await Member.create({
       ...data,
+      patrolHistory: [{ patrol: data.patrol, fromDate: joinedYearStart(data.joinedYear), toDate: null }],
       faceEnrolled: enrollmentFiles.length === 5,
       descriptor,
     });
@@ -150,13 +155,15 @@ export async function enrollMemberFace(req, res) {
 }
 
 export async function listMembers(req, res) {
-  const backfill = await backfillJoinedYears();
+  const joinedYearBackfill = await backfillJoinedYears();
+  const metadataBackfill = await backfillMemberMetadata();
   const members = await Member.find(memberFilter(req.query)).sort({ createdAt: -1 });
-  res.json({ success: true, members, backfill: { matched: backfill.matchedCount, modified: backfill.modifiedCount } });
+  res.json({ success: true, members, backfill: { joinedYear: { matched: joinedYearBackfill.matchedCount, modified: joinedYearBackfill.modifiedCount }, memberMetadata: metadataBackfill } });
 }
 
 export async function exportMembers(req, res) {
   await backfillJoinedYears();
+  await backfillMemberMetadata();
   const members = await Member.find(memberFilter(req.query)).sort({ name: 1 });
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Saifee Rovers";
@@ -166,7 +173,7 @@ export async function exportMembers(req, res) {
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1 },
   });
 
-  sheet.mergeCells("A1:S1");
+  sheet.mergeCells("A1:U1");
   const title = sheet.getCell("A1");
   title.value = "Saifee Rovers Member Directory";
   title.font = { name: "Aptos Display", size: 20, bold: true, color: { argb: "FFFFFFFF" } };
@@ -174,7 +181,7 @@ export async function exportMembers(req, res) {
   title.alignment = { vertical: "middle", horizontal: "left" };
   sheet.getRow(1).height = 34;
 
-  sheet.mergeCells("A2:S2");
+  sheet.mergeCells("A2:U2");
   const subtitle = sheet.getCell("A2");
   subtitle.value = `Generated ${new Date().toLocaleString("en-IN")} • ${members.length} members`;
   subtitle.font = { name: "Aptos", size: 10, color: { argb: "FF475569" } };
@@ -183,13 +190,13 @@ export async function exportMembers(req, res) {
 
   sheet.columns = [
     { key: "itsId", width: 14 }, { key: "name", width: 30 }, { key: "email", width: 36 },
-    { key: "phone", width: 16 }, { key: "dateOfBirth", width: 16 }, { key: "joinedYear", width: 15 }, { key: "profession", width: 16 },
-    { key: "professionDetails", width: 34 }, { key: "patrol", width: 15 }, { key: "role", width: 16 },
+    { key: "phone", width: 16 }, { key: "dateOfBirth", width: 16 }, { key: "hijriDateOfBirth", width: 19 }, { key: "joinedYear", width: 15 }, { key: "profession", width: 16 },
+    { key: "professionDetails", width: 34 }, { key: "patrol", width: 15 }, { key: "patrolHistory", width: 56 }, { key: "role", width: 16 },
     { key: "maritalStatus", width: 16 }, { key: "spouseName", width: 24 }, { key: "spouseDateOfBirth", width: 18 }, { key: "marriageDate", width: 18 }, { key: "children", width: 42 },
     { key: "instrument", width: 18 }, { key: "status", width: 13 }, { key: "face", width: 18 },
     { key: "createdAt", width: 16 },
   ];
-  const headers = ["ITS ID", "Full Name", "Email", "Phone", "Date of Birth", "Joined Saifee Rovers", "Profession", "Profession Details", "Patrol", "Patrol Role", "Marital Status", "Spouse Name", "Spouse Date of Birth", "Marriage Date", "Children", "Instrument", "Status", "Face Enrollment", "Registered On"];
+  const headers = ["ITS ID", "Full Name", "Email", "Phone", "Date of Birth", "Hijri Date of Birth", "Joined Saifee Rovers", "Profession", "Profession Details", "Current Patrol", "Patrol History", "Patrol Role", "Marital Status", "Spouse Name", "Spouse Date of Birth", "Marriage Date", "Children", "Instrument", "Status", "Face Enrollment", "Registered On"];
   sheet.getRow(3).values = headers;
   sheet.getRow(3).height = 26;
   sheet.getRow(3).eachCell((cell) => {
@@ -202,8 +209,8 @@ export async function exportMembers(req, res) {
   for (const member of members) {
     const row = sheet.addRow({
       itsId: member.itsId, name: member.name, email: member.email, phone: member.phone,
-      dateOfBirth: member.dateOfBirth, joinedYear: member.joinedYear || DEFAULT_JOINED_YEAR, profession: member.profession, professionDetails: member.professionDetails || "Not applicable",
-      patrol: member.patrol, role: member.isPatrolLeader ? "Patrol Leader" : "Member",
+      dateOfBirth: member.dateOfBirth, hijriDateOfBirth: member.hijriDateOfBirth, joinedYear: member.joinedYear || DEFAULT_JOINED_YEAR, profession: member.profession, professionDetails: member.professionDetails || "Not applicable",
+      patrol: member.patrol, patrolHistory: formatPatrolHistory(member.patrolHistory), role: member.isPatrolLeader ? "Patrol Leader" : "Member",
       maritalStatus: member.maritalStatus === "MARRIED" ? "Married" : "Unmarried", spouseName: member.spouseName || "Not applicable", spouseDateOfBirth: member.spouseDateOfBirth || null, marriageDate: member.marriageDate || null,
       children: member.children?.length ? member.children.map((child) => `${child.name} (${new Date(child.dateOfBirth).toLocaleDateString("en-IN")})`).join("; ") : "None",
       instrument: member.instrument || "Not assigned", status: member.status === "inactive" ? "Inactive" : "Active",
@@ -217,11 +224,12 @@ export async function exportMembers(req, res) {
   }
   sheet.getColumn("itsId").numFmt = "@";
   sheet.getColumn("phone").numFmt = "@";
+  sheet.getColumn("hijriDateOfBirth").numFmt = "@";
   sheet.getColumn("dateOfBirth").numFmt = "dd-mmm-yyyy";
   sheet.getColumn("spouseDateOfBirth").numFmt = "dd-mmm-yyyy";
   sheet.getColumn("marriageDate").numFmt = "dd-mmm-yyyy";
   sheet.getColumn("createdAt").numFmt = "dd-mmm-yyyy";
-  sheet.autoFilter = { from: "A3", to: `S${Math.max(3, members.length + 3)}` };
+  sheet.autoFilter = { from: "A3", to: `U${Math.max(3, members.length + 3)}` };
 
   const buffer = await workbook.xlsx.writeBuffer();
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -230,6 +238,7 @@ export async function exportMembers(req, res) {
 }
 
 export async function getMember(req, res) {
+  await backfillMemberMetadata();
   const member = await Member.findById(req.params.id);
   if (!member) throw httpError(404, "Member not found");
   res.json({ success: true, member });
@@ -245,12 +254,15 @@ export async function updateMember(req, res) {
     }
   }
   const data = memberBody(req.body);
-  const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, dateOfBirth: data.dateOfBirth ?? member.dateOfBirth, joinedYear: data.joinedYear ?? member.joinedYear ?? DEFAULT_JOINED_YEAR, profession: data.profession ?? member.profession, professionDetails: data.professionDetails ?? member.professionDetails, maritalStatus: data.maritalStatus ?? member.maritalStatus, spouseName: data.spouseName ?? member.spouseName, spouseDateOfBirth: data.spouseDateOfBirth ?? member.spouseDateOfBirth, marriageDate: data.marriageDate ?? member.marriageDate, children: data.children ?? member.children };
+  const next = { patrol: data.patrol ?? member.patrol, instrument: data.instrument ?? member.instrument, isPatrolLeader: data.isPatrolLeader ?? member.isPatrolLeader, dateOfBirth: data.dateOfBirth ?? member.dateOfBirth, hijriDateOfBirth: data.hijriDateOfBirth ?? member.hijriDateOfBirth ?? gregorianToHijri(data.dateOfBirth ?? member.dateOfBirth), joinedYear: data.joinedYear ?? member.joinedYear ?? DEFAULT_JOINED_YEAR, profession: data.profession ?? member.profession, professionDetails: data.professionDetails ?? member.professionDetails, maritalStatus: data.maritalStatus ?? member.maritalStatus, spouseName: data.spouseName ?? member.spouseName, spouseDateOfBirth: data.spouseDateOfBirth ?? member.spouseDateOfBirth, marriageDate: data.marriageDate ?? member.marriageDate, children: data.children ?? member.children };
+  data.hijriDateOfBirth ??= next.hijriDateOfBirth;
   if (next.patrol !== "OFFICERS" && !next.instrument) throw httpError(400, "Instrument is required unless the patrol is OFFICERS");
   validatePersonalDetails(next);
   validateFamilyDetails(next);
   if (next.maritalStatus === "UNMARRIED") Object.assign(data, { spouseName: "", spouseDateOfBirth: null, marriageDate: null, children: [] });
   await ensureUniqueRoles({ ...next, excludeId: member._id });
+  if (next.joinedYear !== member.joinedYear) updateInitialPatrolStart(member, next.joinedYear);
+  applyPatrolTransition(member, next.patrol);
   member.set(data);
   try {
     await member.save();

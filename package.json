@@ -21,7 +21,8 @@
     "migrate:event-media": "node scripts/migrateEventMediaToGridFs.js",
     "migrate:member-anniversaries": "node scripts/migrateMemberAnniversaries.js",
     "cleanup:event-media": "node scripts/cleanupEventMedia.js",
-    "migrate:member-joined-year": "node scripts/migrateMemberJoinedYear.js"
+    "migrate:member-joined-year": "node scripts/migrateMemberJoinedYear.js",
+    "migrate:member-hijri-patrol-history": "node scripts/migrateMemberHijriPatrolHistory.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

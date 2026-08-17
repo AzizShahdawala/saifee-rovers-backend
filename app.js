@@ -38,7 +38,7 @@ app.get("/", (req, res) => res.json({
   api: "/api",
   health: "/api/health",
 }));
-app.get("/api/health", (req, res) => res.json({ success: true, status: "ok", memberSchema: "joined-year-v1", joinedYearRegistered: Boolean(Member.schema.path("joinedYear")) }));
+app.get("/api/health", (req, res) => res.json({ success: true, status: "ok", memberSchema: "hijri-patrol-history-v1", joinedYearRegistered: Boolean(Member.schema.path("joinedYear")), hijriDateOfBirthRegistered: Boolean(Member.schema.path("hijriDateOfBirth")), patrolHistoryRegistered: Boolean(Member.schema.path("patrolHistory")) }));
 app.use("/api", asyncHandler(async (req, res, next) => {
   await connectDB();
   next();
