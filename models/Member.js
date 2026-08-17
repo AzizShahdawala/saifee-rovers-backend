@@ -18,13 +18,6 @@ const imageSchema = new mongoose.Schema({
 const childSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   dateOfBirth: { type: Date, required: true },
-  joinedYear: {
-    type: Number,
-    required: true,
-    min: [MIN_JOINED_YEAR, `Joined year cannot be earlier than ${MIN_JOINED_YEAR}`],
-    max: [new Date().getFullYear(), "Joined year cannot be in the future"],
-    default: DEFAULT_JOINED_YEAR,
-  },
 }, { _id: true });
 
 const memberSchema = new mongoose.Schema({
@@ -49,6 +42,13 @@ const memberSchema = new mongoose.Schema({
     lowercase: true,
   },
   dateOfBirth: { type: Date, required: true },
+  joinedYear: {
+    type: Number,
+    required: true,
+    min: [MIN_JOINED_YEAR, `Joined year cannot be earlier than ${MIN_JOINED_YEAR}`],
+    max: [new Date().getFullYear(), "Joined year cannot be in the future"],
+    default: DEFAULT_JOINED_YEAR,
+  },
   profession: { type: String, required: true, enum: PROFESSIONS },
   professionDetails: { type: String, trim: true, default: "" },
   maritalStatus: { type: String, required: true, enum: ["MARRIED", "UNMARRIED"] },
