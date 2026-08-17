@@ -5,7 +5,7 @@ import httpError from "../utils/httpError.js";
 import { cosineSimilarity, embeddingFromDataUrl } from "../services/faceRecognitionService.js";
 import { refreshEventStatus, syncEventStatuses } from "../services/eventStatusService.js";
 
-const populate = (query) => query.populate("member", "name email phone patrol status images").populate("event", "title date venue");
+const populate = (query) => query.populate("member", "name email phone patrol joinedYear status images").populate("event", "title date venue");
 
 export async function listAttendance(req, res) {
   const filter = {};

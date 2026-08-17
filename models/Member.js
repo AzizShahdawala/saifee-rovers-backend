@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 export const PATROLS = ["FOX", "DOVE", "BULL", "PEACOCK", "OFFICERS", "MENTOR", "MPL", "RHINO", "TURTLE", "SLEEPING", "NRI"];
 export const INSTRUMENTS = ["Saxophone", "Clarinet", "Trumpet", "Trombone", "Euphonium", "Side Drum", "Base Drum", "Rhythm", "Band Inspector"];
 export const PROFESSIONS = ["BUSINESS", "JOB", "STUDENT", "RETIRED", "OTHER"];
+export const DEFAULT_JOINED_YEAR = 2020;
+export const MIN_JOINED_YEAR = 1947;
 export const generateMemberId = () => String(crypto.randomInt(10_000_000, 100_000_000));
 
 const imageSchema = new mongoose.Schema({
@@ -16,6 +18,13 @@ const imageSchema = new mongoose.Schema({
 const childSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   dateOfBirth: { type: Date, required: true },
+  joinedYear: {
+    type: Number,
+    required: true,
+    min: [MIN_JOINED_YEAR, `Joined year cannot be earlier than ${MIN_JOINED_YEAR}`],
+    max: [new Date().getFullYear(), "Joined year cannot be in the future"],
+    default: DEFAULT_JOINED_YEAR,
+  },
 }, { _id: true });
 
 const memberSchema = new mongoose.Schema({
