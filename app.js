@@ -22,6 +22,7 @@ import asyncHandler from "./utils/asyncHandler.js";
 import { getDashboard } from "./controllers/dashboardController.js";
 import { recognitionServiceHealth } from "./services/faceRecognitionService.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import Member from "./models/Member.js";
 
 const app = express();
 const origins = (process.env.CORS_ORIGIN || "http://localhost:5173").split(",").map((item) => item.trim());
@@ -37,7 +38,7 @@ app.get("/", (req, res) => res.json({
   api: "/api",
   health: "/api/health",
 }));
-app.get("/api/health", (req, res) => res.json({ success: true, status: "ok", memberSchema: "joined-year-v1" }));
+app.get("/api/health", (req, res) => res.json({ success: true, status: "ok", memberSchema: "joined-year-v1", joinedYearRegistered: Boolean(Member.schema.path("joinedYear")) }));
 app.use("/api", asyncHandler(async (req, res, next) => {
   await connectDB();
   next();

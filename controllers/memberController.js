@@ -150,9 +150,9 @@ export async function enrollMemberFace(req, res) {
 }
 
 export async function listMembers(req, res) {
-  await backfillJoinedYears();
+  const backfill = await backfillJoinedYears();
   const members = await Member.find(memberFilter(req.query)).sort({ createdAt: -1 });
-  res.json({ success: true, members });
+  res.json({ success: true, members, backfill: { matched: backfill.matchedCount, modified: backfill.modifiedCount } });
 }
 
 export async function exportMembers(req, res) {
